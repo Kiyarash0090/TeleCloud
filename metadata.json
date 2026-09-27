@@ -1,0 +1,6 @@
+{
+  "name": "TeleCloud - Telegram Cloud Storage & File Manager",
+  "description": "Convert your Telegram Saved Messages into a high-speed, secure Google Drive-style cloud file manager with direct streaming, media players, and zero server disk storage.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
