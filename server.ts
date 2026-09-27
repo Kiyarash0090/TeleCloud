@@ -9,6 +9,7 @@ import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
 import { Api } from 'telegram/tl/index.js';
 import { CustomFile } from 'telegram/client/uploads.js';
+import { computeCheck } from 'telegram/Password.js';
 import crypto from 'crypto';
 import bigInt from 'big-integer';
 import { spawn } from 'child_process';
@@ -86,6 +87,7 @@ interface ActiveTelegramSession {
   stringSession: string;
   phoneCodeHash?: string;
   phoneNumber?: string;
+  awaiting2FA?: boolean;
   user?: {
     id: string;
     firstName: string;
@@ -97,6 +99,10 @@ interface ActiveTelegramSession {
 }
 
 const activeSessions = new Map<string, ActiveTelegramSession>();
+const pendingAuthSessions = new Map<string, ActiveTelegramSession>();
+const clientPool = new Map<string, TelegramClient>();
+const userClientMap = new Map<string, TelegramClient>();
+const profilePhotoCache = new Map<string, { buffer: Buffer; cachedAt: number }>();
 
 // In-Memory async upload task queue tracker
 export interface UploadTask {
@@ -367,7 +373,7 @@ app.post('/api/telegram/send-code', async (req: Request, res: Response) => {
       cleanPhone
     );
 
-    activeSessions.set(sessionId, {
+    pendingAuthSessions.set(sessionId, {
       client,
       apiId: numericApiId,
       apiHash: cleanApiHash,
@@ -398,7 +404,7 @@ app.post('/api/telegram/sign-in', async (req: Request, res: Response) => {
   try {
     const { phoneCode, password } = req.body;
     const sessionId = getSessionId(req);
-    const session = activeSessions.get(sessionId);
+    const session = pendingAuthSessions.get(sessionId) || activeSessions.get(sessionId);
 
     if (!session || !session.client || !session.phoneNumber || !session.phoneCodeHash) {
       return res.status(400).json({ error: 'No active login session found. Please request a verification code first.' });
@@ -406,28 +412,63 @@ app.post('/api/telegram/sign-in', async (req: Request, res: Response) => {
 
     const { client, phoneNumber, phoneCodeHash } = session;
 
-    try {
-      await (client as any).signInUser(
-        {
-          apiId: session.apiId,
-          apiHash: session.apiHash,
-        },
-        {
-          phoneNumber: async () => phoneNumber,
-          phoneCodeHash,
-          phoneCode: async () => phoneCode.trim(),
-          password: async () => (password ? password.trim() : ''),
-          onError: (err: any) => console.error('GramJS sign in error:', err),
+    if (!client.connected) {
+      await client.connect();
+    }
+
+    if (!session.awaiting2FA) {
+      if (!phoneCode || !String(phoneCode).trim()) {
+        return res.status(400).json({ error: 'Verification code is required.' });
+      }
+      try {
+        await client.invoke(
+          new Api.auth.SignIn({
+            phoneNumber,
+            phoneCodeHash,
+            phoneCode: String(phoneCode).trim(),
+          })
+        );
+      } catch (authError: any) {
+        if (
+          authError.message?.includes('SESSION_PASSWORD_NEEDED') ||
+          authError.errorMessage === 'SESSION_PASSWORD_NEEDED'
+        ) {
+          session.awaiting2FA = true;
+          if (!password || !String(password).trim()) {
+            let passwordHint = '';
+            try {
+              const pwdInfo = await client.invoke(new Api.account.GetPassword());
+              passwordHint = pwdInfo.hint || '';
+            } catch {
+              // ignore hint error
+            }
+            return res.status(401).json({
+              needs2FA: true,
+              hint: passwordHint,
+              error: 'Two-Step Verification password (2FA) is required for this account.',
+            });
+          }
+        } else {
+          throw authError;
         }
-      );
-    } catch (authError: any) {
-      if (authError.message?.includes('SESSION_PASSWORD_NEEDED') || authError.errorMessage === 'SESSION_PASSWORD_NEEDED') {
+      }
+    }
+
+    if (session.awaiting2FA) {
+      if (!password || !String(password).trim()) {
         return res.status(401).json({
           needs2FA: true,
           error: 'Two-Step Verification password (2FA) is required for this account.',
         });
       }
-      throw authError;
+      const passwordSrpResult = await client.invoke(new Api.account.GetPassword());
+      const passwordSrpCheck = await computeCheck(passwordSrpResult, String(password).trim());
+      await client.invoke(
+        new Api.auth.CheckPassword({
+          password: passwordSrpCheck,
+        })
+      );
+      session.awaiting2FA = false;
     }
 
     const me = (await client.getMe()) as any;
@@ -442,7 +483,12 @@ app.post('/api/telegram/sign-in', async (req: Request, res: Response) => {
       phone: me.phone || session.phoneNumber,
     };
 
+    pendingAuthSessions.delete(sessionId);
     activeSessions.set(sessionId, session);
+    clientPool.set(savedString, client);
+    if (session.user.id) {
+      userClientMap.set(session.user.id, client);
+    }
 
     // Generate encrypted remember token
     const encryptedToken = encryptSession({
@@ -462,6 +508,8 @@ app.post('/api/telegram/sign-in', async (req: Request, res: Response) => {
     return res.json({
       success: true,
       user: session.user,
+      apiId: session.apiId,
+      apiHash: session.apiHash,
       sessionString: savedString,
       encryptedToken,
       message: 'Successfully connected to Telegram!',
@@ -482,16 +530,24 @@ app.post('/api/telegram/session-login', async (req: Request, res: Response) => {
     }
 
     const numericApiId = Number(apiId);
+    const cleanHash = apiHash.trim();
+    const cleanSessionStr = sessionString.trim();
     const sessionId = getSessionId(req) || `sess_${Date.now()}`;
-    const stringSession = new StringSession(sessionString.trim());
-    const client = new TelegramClient(stringSession, numericApiId, apiHash.trim(), {
-      connectionRetries: 5,
-    });
 
-    await client.connect();
+    let client = clientPool.get(cleanSessionStr);
+    if (!client) {
+      const strSession = new StringSession(cleanSessionStr);
+      client = new TelegramClient(strSession, numericApiId, cleanHash, {
+        connectionRetries: 5,
+      });
+      await client.connect();
+    } else if (!client.connected) {
+      await client.connect();
+    }
 
     const isAuthorized = await client.isUserAuthorized();
     if (!isAuthorized) {
+      clientPool.delete(cleanSessionStr);
       return res.status(401).json({ error: 'Session is expired or invalid' });
     }
 
@@ -504,11 +560,16 @@ app.post('/api/telegram/session-login', async (req: Request, res: Response) => {
       phone: me.phone || '',
     };
 
+    clientPool.set(cleanSessionStr, client);
+    if (userData.id) {
+      userClientMap.set(userData.id, client);
+    }
+
     activeSessions.set(sessionId, {
       client,
       apiId: numericApiId,
-      apiHash: apiHash.trim(),
-      stringSession: sessionString.trim(),
+      apiHash: cleanHash,
+      stringSession: cleanSessionStr,
       user: userData,
       connectedAt: new Date(),
     });
@@ -517,8 +578,8 @@ app.post('/api/telegram/session-login', async (req: Request, res: Response) => {
 
     const encryptedToken = encryptSession({
       apiId: numericApiId,
-      apiHash: apiHash.trim(),
-      sessionString: sessionString.trim(),
+      apiHash: cleanHash,
+      sessionString: cleanSessionStr,
       user: userData,
       createdAt: Date.now(),
     });
@@ -532,7 +593,9 @@ app.post('/api/telegram/session-login', async (req: Request, res: Response) => {
     return res.json({
       success: true,
       user: userData,
-      sessionString: sessionString.trim(),
+      apiId: numericApiId,
+      apiHash: cleanHash,
+      sessionString: cleanSessionStr,
       encryptedToken,
     });
   } catch (err: any) {
@@ -542,7 +605,7 @@ app.post('/api/telegram/session-login', async (req: Request, res: Response) => {
   }
 });
 
-// Restore session from encrypted token (Remember Me)
+// Restore session from encrypted token (Remember Me & Fast Multi-Account Switch)
 app.post('/api/telegram/restore-session', async (req: Request, res: Response) => {
   try {
     const token = req.body.token || req.cookies?.telecloud_remember_token || req.headers['x-telecloud-remember-token'];
@@ -556,14 +619,21 @@ app.post('/api/telegram/restore-session', async (req: Request, res: Response) =>
     }
 
     const sessionId = getSessionId(req) || `sess_${Date.now()}`;
-    const stringSession = new StringSession(payload.sessionString);
-    const client = new TelegramClient(stringSession, payload.apiId, payload.apiHash, {
-      connectionRetries: 5,
-    });
+    let client = clientPool.get(payload.sessionString);
 
-    await client.connect();
+    if (!client) {
+      const stringSession = new StringSession(payload.sessionString);
+      client = new TelegramClient(stringSession, payload.apiId, payload.apiHash, {
+        connectionRetries: 5,
+      });
+      await client.connect();
+    } else if (!client.connected) {
+      await client.connect();
+    }
+
     const isAuthorized = await client.isUserAuthorized();
     if (!isAuthorized) {
+      clientPool.delete(payload.sessionString);
       res.clearCookie('telecloud_remember_token');
       return res.status(401).json({ success: false, error: 'Saved Telegram session has expired' });
     }
@@ -577,6 +647,11 @@ app.post('/api/telegram/restore-session', async (req: Request, res: Response) =>
       phone: me.phone || payload.user?.phone || '',
     };
 
+    clientPool.set(payload.sessionString, client);
+    if (userData.id) {
+      userClientMap.set(userData.id, client);
+    }
+
     activeSessions.set(sessionId, {
       client,
       apiId: payload.apiId,
@@ -587,11 +662,19 @@ app.post('/api/telegram/restore-session', async (req: Request, res: Response) =>
     });
 
     res.cookie('telecloud_sid', sessionId, { httpOnly: true, maxAge: 30 * 24 * 3600 * 1000 });
+    res.cookie('telecloud_remember_token', token, {
+      httpOnly: true,
+      maxAge: 30 * 24 * 3600 * 1000,
+      sameSite: 'lax',
+    });
 
     return res.json({
       success: true,
       user: userData,
+      apiId: payload.apiId,
+      apiHash: payload.apiHash,
       sessionString: payload.sessionString,
+      encryptedToken: token,
     });
   } catch (err: any) {
     console.error('Error restoring session:', err);
@@ -611,9 +694,14 @@ app.get('/api/telegram/status', async (req: Request, res: Response) => {
       const payload = decryptSession(rememberToken);
       if (payload && payload.apiId && payload.apiHash && payload.sessionString) {
         try {
-          const stringSession = new StringSession(payload.sessionString);
-          const client = new TelegramClient(stringSession, payload.apiId, payload.apiHash, { connectionRetries: 3 });
-          await client.connect();
+          let client = clientPool.get(payload.sessionString);
+          if (!client) {
+            const stringSession = new StringSession(payload.sessionString);
+            client = new TelegramClient(stringSession, payload.apiId, payload.apiHash, { connectionRetries: 3 });
+            await client.connect();
+          } else if (!client.connected) {
+            await client.connect();
+          }
           if (await client.isUserAuthorized()) {
             const me = (await client.getMe()) as any;
             const userData = {
@@ -623,6 +711,10 @@ app.get('/api/telegram/status', async (req: Request, res: Response) => {
               username: me.username || payload.user?.username || '',
               phone: me.phone || payload.user?.phone || '',
             };
+            clientPool.set(payload.sessionString, client);
+            if (userData.id) {
+              userClientMap.set(userData.id, client);
+            }
             activeSessions.set(sessionId, {
               client,
               apiId: payload.apiId,
@@ -635,7 +727,9 @@ app.get('/api/telegram/status', async (req: Request, res: Response) => {
               connected: true,
               user: userData,
               apiId: payload.apiId,
+              apiHash: payload.apiHash,
               sessionString: payload.sessionString,
+              encryptedToken: rememberToken,
               autoRestored: true,
             });
           }
@@ -655,11 +749,21 @@ app.get('/api/telegram/status', async (req: Request, res: Response) => {
       return res.json({ connected: false });
     }
 
+    const encryptedToken = encryptSession({
+      apiId: session.apiId,
+      apiHash: session.apiHash,
+      sessionString: session.stringSession,
+      user: session.user,
+      createdAt: Date.now(),
+    });
+
     return res.json({
       connected: true,
       user: session.user,
       apiId: session.apiId,
+      apiHash: session.apiHash,
       sessionString: session.stringSession,
+      encryptedToken,
     });
   } catch (err) {
     return res.json({ connected: false });
@@ -715,6 +819,10 @@ app.get('/api/telegram/full-user', async (req: Request, res: Response) => {
       phone: fullUserData.phone,
     };
 
+    if (fullUserData.id) {
+      userClientMap.set(fullUserData.id, session.client);
+    }
+
     return res.json({
       success: true,
       user: fullUserData,
@@ -725,30 +833,47 @@ app.get('/api/telegram/full-user', async (req: Request, res: Response) => {
   }
 });
 
-// Download / Stream User Profile Photo from Telegram
+// Download / Stream User Profile Photo from Telegram (supports ?uid=... for multi-account avatars)
 app.get('/api/telegram/profile-photo', async (req: Request, res: Response) => {
   const sessionId = getSessionId(req);
   const session = activeSessions.get(sessionId);
+  const requestedUid = typeof req.query.uid === 'string' ? req.query.uid.trim() : (session?.user?.id || '');
 
-  if (!session || !session.client) {
+  // Check in-memory profile photo cache first
+  if (requestedUid) {
+    const cachedPhoto = profilePhotoCache.get(requestedUid);
+    if (cachedPhoto && Date.now() - cachedPhoto.cachedAt < 3600000) {
+      res.setHeader('Content-Type', 'image/jpeg');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.send(cachedPhoto.buffer);
+    }
+  }
+
+  const targetClient = (requestedUid && userClientMap.get(requestedUid)) || session?.client;
+
+  if (!targetClient) {
     return res.status(404).send('Not connected');
   }
 
   try {
-    const isAuthorized = await session.client.isUserAuthorized();
+    const isAuthorized = await targetClient.isUserAuthorized();
     if (!isAuthorized) {
       return res.status(401).send('Unauthorized');
     }
 
     // Download profile photo using GramJS
-    const buffer = (await session.client.downloadProfilePhoto('me', {
+    const buffer = (await targetClient.downloadProfilePhoto('me', {
       isBig: true,
     })) as Buffer | null;
 
     if (buffer && buffer.length > 0) {
+      const nodeBuf = Buffer.from(buffer);
+      if (requestedUid) {
+        profilePhotoCache.set(requestedUid, { buffer: nodeBuf, cachedAt: Date.now() });
+      }
       res.setHeader('Content-Type', 'image/jpeg');
       res.setHeader('Cache-Control', 'public, max-age=3600');
-      return res.send(buffer);
+      return res.send(nodeBuf);
     } else {
       return res.status(404).send('No profile photo');
     }
@@ -757,12 +882,41 @@ app.get('/api/telegram/profile-photo', async (req: Request, res: Response) => {
   }
 });
 
-// Telegram Logout
+// Telegram Logout (supports removing specific account or active session)
 app.post('/api/telegram/logout', async (req: Request, res: Response) => {
   const sessionId = getSessionId(req);
   const session = activeSessions.get(sessionId);
+  const targetAccountId = req.body?.accountId ? String(req.body.accountId) : undefined;
+
+  if (targetAccountId) {
+    const clientForUser = userClientMap.get(targetAccountId);
+    if (clientForUser) {
+      userClientMap.delete(targetAccountId);
+      profilePhotoCache.delete(targetAccountId);
+      for (const [sessStr, pooledClient] of clientPool.entries()) {
+        if (pooledClient === clientForUser) {
+          clientPool.delete(sessStr);
+        }
+      }
+      try {
+        await clientForUser.disconnect();
+      } catch (e) {}
+    }
+    if (session?.user?.id === targetAccountId) {
+      activeSessions.delete(sessionId);
+      res.clearCookie('telecloud_remember_token');
+    }
+    return res.json({ success: true, message: 'Account disconnected' });
+  }
 
   if (session && session.client) {
+    if (session.user?.id) {
+      userClientMap.delete(session.user.id);
+      profilePhotoCache.delete(session.user.id);
+    }
+    if (session.stringSession) {
+      clientPool.delete(session.stringSession);
+    }
     try {
       await session.client.disconnect();
     } catch (e) {
@@ -776,11 +930,92 @@ app.post('/api/telegram/logout', async (req: Request, res: Response) => {
   return res.json({ success: true, message: 'Disconnected from Telegram' });
 });
 
+// Helper to parse target peer (Saved Messages 'me', channel/group/user id or username)
+function getTargetPeer(peerParam: any): any {
+  if (!peerParam || peerParam === 'me' || peerParam === 'self') return 'me';
+  if (typeof peerParam === 'string' && peerParam.startsWith('@')) return peerParam;
+  const num = Number(peerParam);
+  if (!isNaN(num)) {
+    return bigInt(num);
+  }
+  return peerParam;
+}
+
+// Get all user chats, channels, groups, and bots
+app.get('/api/telegram/chats', async (req: Request, res: Response) => {
+  try {
+    const sessionId = getSessionId(req);
+    const client = getActiveClient(sessionId);
+
+    if (!client) {
+      return res.status(401).json({ error: 'Not connected to Telegram' });
+    }
+
+    const dialogs = await client.getDialogs({ limit: 80 });
+    const chats: any[] = [];
+
+    chats.push({
+      id: 'me',
+      title: 'Saved Messages (پیام‌های ذخیره‌شده)',
+      type: 'saved',
+      username: 'me',
+      unreadCount: 0,
+    });
+
+    for (const dialog of dialogs) {
+      const entity = dialog.entity;
+      if (!entity) continue;
+      
+      const id = entity.id?.toString();
+      if (!id || id === 'me' || id === 'self') continue;
+
+      let type = 'user';
+      let title = '';
+      let username = (entity as any).username || '';
+
+      if ('title' in entity && entity.title) {
+        title = entity.title;
+        if ('megagroup' in entity && entity.megagroup) {
+          type = 'supergroup';
+        } else if ('broadcast' in entity && entity.broadcast) {
+          type = 'channel';
+        } else {
+          type = 'group';
+        }
+      } else if ('firstName' in entity) {
+        title = `${entity.firstName || ''} ${entity.lastName || ''}`.trim() || 'User';
+        if ('bot' in entity && entity.bot) {
+          type = 'bot';
+        } else {
+          type = 'user';
+        }
+      }
+
+      if (id === '777000' || title.includes('Telegram')) {
+        type = 'service';
+      }
+
+      chats.push({
+        id,
+        title,
+        type,
+        username,
+        unreadCount: dialog.unreadCount || 0,
+      });
+    }
+
+    return res.json({ success: true, chats });
+  } catch (err: any) {
+    console.error('Error fetching chats:', err);
+    return res.status(500).json({ error: err.message || 'Failed to fetch chats' });
+  }
+});
+
 // ----------------------------------------------------
-// 3. Saved Messages Cloud File Operations
+// 3. Saved Messages & Chat Cloud File Operations
 // ----------------------------------------------------
 
-// Fetch all media/documents from "Saved Messages" ('me')
+// Fetch all media/documents from selected peer chat/channel/bot
 app.get('/api/telegram/files', async (req: Request, res: Response) => {
   try {
     const sessionId = getSessionId(req);
@@ -794,9 +1029,11 @@ app.get('/api/telegram/files', async (req: Request, res: Response) => {
     const offsetId = Number(req.query.offsetId) || 0;
     const category = (req.query.category as string) || 'all';
     const searchQuery = (req.query.search as string)?.toLowerCase() || '';
+    const peerParam = (req.query.peer as string) || 'me';
+    const peer = getTargetPeer(peerParam);
 
-    // Fetch messages from Saved Messages (peer 'me')
-    const messages = await client.getMessages('me', {
+    // Fetch messages from selected peer
+    const messages = await client.getMessages(peer, {
       limit,
       offsetId,
     });
@@ -804,7 +1041,7 @@ app.get('/api/telegram/files', async (req: Request, res: Response) => {
     const files: any[] = [];
 
     for (const msg of messages) {
-      if (!msg.media) continue;
+      if (!msg || !msg.media) continue;
 
       let filename = 'file';
       let mimeType = 'application/octet-stream';
@@ -875,6 +1112,7 @@ app.get('/api/telegram/files', async (req: Request, res: Response) => {
         continue;
       }
 
+      const currentUid = activeSessions.get(sessionId)?.user?.id || sessionId;
       files.push({
         id: msg.id,
         filename,
@@ -887,9 +1125,9 @@ app.get('/api/telegram/files', async (req: Request, res: Response) => {
         duration,
         width,
         height,
-        directUrl: `/api/telegram/stream/${msg.id}/${encodeURIComponent(filename)}`,
-        downloadUrl: `/api/telegram/download/${msg.id}/${encodeURIComponent(filename)}`,
-        thumbnailUrl: hasThumb ? `/api/telegram/thumbnail/${msg.id}` : null,
+        directUrl: `/api/telegram/stream/${msg.id}/${encodeURIComponent(filename)}?peer=${encodeURIComponent(peerParam)}&uid=${encodeURIComponent(currentUid)}`,
+        downloadUrl: `/api/telegram/download/${msg.id}/${encodeURIComponent(filename)}?peer=${encodeURIComponent(peerParam)}&uid=${encodeURIComponent(currentUid)}`,
+        thumbnailUrl: hasThumb ? `/api/telegram/thumbnail/${msg.id}?peer=${encodeURIComponent(peerParam)}&uid=${encodeURIComponent(currentUid)}` : null,
       });
     }
 
@@ -897,7 +1135,7 @@ app.get('/api/telegram/files', async (req: Request, res: Response) => {
       success: true,
       files,
       count: files.length,
-      nextOffsetId: messages.length > 0 ? messages[messages.length - 1].id : 0,
+      nextOffsetId: messages.length > 0 && messages[messages.length - 1] ? messages[messages.length - 1].id : 0,
     });
   } catch (err: any) {
     console.error('Error fetching files from Telegram:', err);
@@ -915,7 +1153,8 @@ app.get('/api/telegram/stats', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Not connected to Telegram' });
     }
 
-    const messages = await client.getMessages('me', { limit: 200 });
+    const peer = getTargetPeer(req.query.peer);
+    const messages = await client.getMessages(peer, { limit: 200 });
 
     const stats = {
       totalFiles: 0,
@@ -931,7 +1170,7 @@ app.get('/api/telegram/stats', async (req: Request, res: Response) => {
     };
 
     for (const msg of messages) {
-      if (!msg.media) continue;
+      if (!msg || !msg.media) continue;
 
       let filename = 'file';
       let mimeType = 'application/octet-stream';
@@ -967,7 +1206,7 @@ app.get('/api/telegram/stats', async (req: Request, res: Response) => {
 });
 
 // In-Memory Thumbnail Cache to prevent repeated MTProto requests for identical small images
-const thumbMemoryCache = new Map<number, { buffer: Buffer; mime: string; cachedAt: number }>();
+const thumbMemoryCache = new Map<string, { buffer: Buffer; mime: string; cachedAt: number }>();
 
 // Stream Thumbnail directly from RAM
 app.get('/api/telegram/thumbnail/:messageId', async (req: Request, res: Response) => {
@@ -980,20 +1219,26 @@ app.get('/api/telegram/thumbnail/:messageId', async (req: Request, res: Response
       return res.status(400).send('Invalid request');
     }
 
+    const currentUid = activeSessions.get(sessionId)?.user?.id || sessionId;
+    const peerParam = String(req.query.peer || 'me');
+    const cacheKey = `${currentUid}_${peerParam}_${messageId}`;
+
     // Check RAM cache (expire after 1 hour)
-    const cached = thumbMemoryCache.get(messageId);
+    const cached = thumbMemoryCache.get(cacheKey);
     if (cached && Date.now() - cached.cachedAt < 3600000) {
       res.setHeader('Content-Type', cached.mime);
       res.setHeader('Cache-Control', 'public, max-age=86400');
       return res.send(cached.buffer);
     }
 
-    const messages = await client.getMessages('me', { ids: [messageId] });
-    if (!messages || messages.length === 0 || !messages[0].media) {
+    const peer = getTargetPeer(req.query.peer);
+    const messages = await client.getMessages(peer, { ids: [messageId] });
+    const msg = messages?.[0];
+    if (!msg || !msg.media) {
       return res.status(404).send('Not found');
     }
 
-    const media = messages[0].media;
+    const media = msg.media;
     const buffer = await client.downloadMedia(media, {
       thumb: 1, // Small/medium thumbnail
     });
@@ -1003,7 +1248,7 @@ app.get('/api/telegram/thumbnail/:messageId', async (req: Request, res: Response
     }
 
     const nodeBuf = Buffer.from(buffer);
-    thumbMemoryCache.set(messageId, {
+    thumbMemoryCache.set(cacheKey, {
       buffer: nodeBuf,
       mime: 'image/jpeg',
       cachedAt: Date.now(),
@@ -1032,12 +1277,13 @@ app.get(['/api/telegram/stream/:messageId/:filename?', '/api/telegram/download/:
       return res.status(401).json({ error: 'Session not authenticated or message ID invalid' });
     }
 
-    const messages = await client.getMessages('me', { ids: [messageId] });
-    if (!messages || messages.length === 0 || !messages[0].media) {
-      return res.status(404).json({ error: 'File not found in Saved Messages' });
+    const peer = getTargetPeer(req.query.peer);
+    const messages = await client.getMessages(peer, { ids: [messageId] });
+    const msg = messages?.[0];
+    if (!msg || !msg.media) {
+      return res.status(404).json({ error: 'File not found in chat/channel' });
     }
 
-    const msg = messages[0];
     const media = msg.media;
     let totalSize = 0;
     let mimeType = 'application/octet-stream';
@@ -1135,6 +1381,22 @@ app.get(['/api/telegram/transcode/:messageId/:filename?', '/api/telegram/transco
     const quality = (req.query.quality as string) || 'auto';
     const demoUrl = req.query.demoUrl as string;
 
+    let media: Api.TypeMessageMedia | null = null;
+
+    if (!demoUrl) {
+      if (!client || isNaN(messageId)) {
+        return res.status(401).json({ error: 'Not authenticated with Telegram' });
+      }
+
+      const peer = getTargetPeer(req.query.peer);
+      const messages = await client.getMessages(peer, { ids: [messageId] });
+      const msg = messages?.[0];
+      if (!msg || !msg.media) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+      media = msg.media;
+    }
+
     // Set streaming headers for fragmented MP4
     res.setHeader('Content-Type', 'video/mp4');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -1198,6 +1460,9 @@ app.get(['/api/telegram/transcode/:messageId/:filename?', '/api/telegram/transco
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
+    ffmpegProcess.stdin.on('error', () => {});
+    ffmpegProcess.stdout.on('error', () => {});
+
     // Pipe FFmpeg output directly to browser HTTP response
     ffmpegProcess.stdout.pipe(res);
 
@@ -1209,6 +1474,8 @@ app.get(['/api/telegram/transcode/:messageId/:filename?', '/api/telegram/transco
       console.error('FFmpeg process error:', err);
       if (!res.headersSent) {
         res.status(500).end();
+      } else {
+        res.end();
       }
     });
 
@@ -1221,29 +1488,9 @@ app.get(['/api/telegram/transcode/:messageId/:filename?', '/api/telegram/transco
     });
 
     // If demo URL, FFmpeg handles reading from URL directly
-    if (demoUrl) {
+    if (demoUrl || !client || !media) {
       return;
     }
-
-    // Otherwise stream from Telegram MTProto
-    if (!client || isNaN(messageId)) {
-      ffmpegProcess.stdin.destroy();
-      if (!res.headersSent) {
-        return res.status(401).json({ error: 'Not authenticated with Telegram' });
-      }
-      return;
-    }
-
-    const messages = await client.getMessages('me', { ids: [messageId] });
-    if (!messages || messages.length === 0 || !messages[0].media) {
-      ffmpegProcess.stdin.destroy();
-      if (!res.headersSent) {
-        return res.status(404).json({ error: 'File not found' });
-      }
-      return;
-    }
-
-    const media = messages[0].media;
 
     // Stream Telegram data into FFmpeg stdin with backpressure management
     (async () => {
@@ -1284,7 +1531,7 @@ app.get(['/api/telegram/transcode/:messageId/:filename?', '/api/telegram/transco
   }
 });
 
-// Delete a message/file from Saved Messages
+// Delete a message/file from Saved Messages only (Other chats/channels are strictly Read-Only)
 app.delete('/api/telegram/file/:messageId', async (req: Request, res: Response) => {
   try {
     const sessionId = getSessionId(req);
@@ -1295,10 +1542,18 @@ app.delete('/api/telegram/file/:messageId', async (req: Request, res: Response) 
       return res.status(400).json({ error: 'Invalid message ID or not authenticated' });
     }
 
+    const rawPeer = req.query.peer ? String(req.query.peer).trim() : 'me';
+    if (rawPeer !== 'me') {
+      return res.status(403).json({
+        error: 'Read-only mode: Deleting files is only allowed in Saved Messages.',
+      });
+    }
+
     await client.deleteMessages('me', [messageId], { revoke: true });
 
     // Invalidate thumbnail cache
-    thumbMemoryCache.delete(messageId);
+    const currentUid = activeSessions.get(sessionId)?.user?.id || sessionId;
+    thumbMemoryCache.delete(`${currentUid}_me_${messageId}`);
 
     return res.json({ success: true, message: 'File deleted from Saved Messages' });
   } catch (err: any) {
@@ -1308,7 +1563,7 @@ app.delete('/api/telegram/file/:messageId', async (req: Request, res: Response) 
 });
 
 // ----------------------------------------------------
-// 5. Zero-Disk In-Memory Upload to Saved Messages
+// 5. Zero-Disk In-Memory Upload Strictly to Saved Messages ('me')
 // ----------------------------------------------------
 app.post('/api/telegram/upload', upload.single('file'), async (req: Request, res: Response) => {
   try {
@@ -1317,6 +1572,13 @@ app.post('/api/telegram/upload', upload.single('file'), async (req: Request, res
 
     if (!client) {
       return res.status(401).json({ error: 'Not connected to Telegram' });
+    }
+
+    const rawPeer = (req.body.peer || req.query.peer || 'me').toString().trim();
+    if (rawPeer !== 'me') {
+      return res.status(403).json({
+        error: 'آپلود فایل فقط در سیو مسیج (Saved Messages) مجاز است و سایر کانال‌ها و چت‌ها فقط خواندنی هستند.',
+      });
     }
 
     const file = req.file;
@@ -1330,7 +1592,7 @@ app.post('/api/telegram/upload', upload.single('file'), async (req: Request, res
     // Create a CustomFile in RAM without writing to disk
     const customFile = new CustomFile(originalName, file.size, '', file.buffer);
 
-    // Upload to Saved Messages ('me')
+    // Upload strictly to Saved Messages ('me')
     const uploadedMessage = await client.sendFile('me', {
       file: customFile,
       caption: caption || originalName,

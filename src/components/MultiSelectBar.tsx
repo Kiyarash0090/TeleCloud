@@ -22,8 +22,10 @@ export function MultiSelectBar() {
     clearSelection,
     deleteMultipleFiles,
     activeAudio,
+    activePeer,
   } = useTelegram();
   const { lang } = useTheme();
+  const isSavedMessages = !activePeer || activePeer === 'me';
 
   const [copiedBatch, setCopiedBatch] = useState(false);
   const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
@@ -134,35 +136,37 @@ export function MultiSelectBar() {
             )}
           </button>
 
-          {/* Batch Delete */}
-          <button
-            onClick={handleBatchDelete}
-            disabled={isDeleting}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer ${
-              confirmBatchDelete
-                ? 'bg-rose-600 text-white ring-2 ring-rose-400'
-                : 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30'
-            }`}
-          >
-            {isDeleting ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-            ) : (
-              <Trash2 className="w-3.5 h-3.5 shrink-0" />
-            )}
-            <span>
-              {isDeleting
-                ? lang === 'fa'
-                  ? 'در حال حذف...'
-                  : 'Deleting...'
-                : confirmBatchDelete
-                ? lang === 'fa'
-                  ? 'تأیید حذف؟'
-                  : 'Confirm?'
-                : lang === 'fa'
-                ? 'حذف'
-                : 'Delete'}
-            </span>
-          </button>
+          {/* Batch Delete (Strictly in Saved Messages) */}
+          {isSavedMessages && (
+            <button
+              onClick={handleBatchDelete}
+              disabled={isDeleting}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer ${
+                confirmBatchDelete
+                  ? 'bg-rose-600 text-white ring-2 ring-rose-400'
+                  : 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30'
+              }`}
+            >
+              {isDeleting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+              ) : (
+                <Trash2 className="w-3.5 h-3.5 shrink-0" />
+              )}
+              <span>
+                {isDeleting
+                  ? lang === 'fa'
+                    ? 'در حال حذف...'
+                    : 'Deleting...'
+                  : confirmBatchDelete
+                  ? lang === 'fa'
+                    ? 'تأیید حذف؟'
+                    : 'Confirm?'
+                  : lang === 'fa'
+                  ? 'حذف'
+                  : 'Delete'}
+              </span>
+            </button>
+          )}
 
           {/* Clear Selection */}
           <button

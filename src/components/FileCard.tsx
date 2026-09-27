@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { TelegramFile } from '../types';
 import { formatFileSize, formatDate, formatDuration, getFileExtension, getFileColor } from '../utils/formatters';
-import { useTelegram } from '../context/TelegramContext';
+import { useTelegram, useBackHandler } from '../context/TelegramContext';
 import { useTheme } from '../context/ThemeContext';
 
 export function FileCard({ file }: { file: TelegramFile }) {
@@ -34,13 +34,18 @@ export function FileCard({ file }: { file: TelegramFile }) {
     selectedFileIds,
     isSelectionMode,
     toggleSelectFile,
+    activePeer,
   } = useTelegram();
   const { t, lang } = useTheme();
+  const isSavedMessages = !activePeer || activePeer === 'me';
 
   const [copied, setCopied] = useState(false);
   const [showMobileActions, setShowMobileActions] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+
+  useBackHandler(showMobileActions, () => setShowMobileActions(false));
+  useBackHandler(Boolean(contextMenuPos), () => setContextMenuPos(null));
 
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggeredRef = useRef(false);
@@ -380,13 +385,15 @@ export function FileCard({ file }: { file: TelegramFile }) {
             <span>{isSelected ? (lang === 'fa' ? 'لغو انتخاب' : 'Deselect') : (lang === 'fa' ? 'انتخاب فایل' : 'Select')}</span>
           </button>
 
-          <button
-            onClick={handleDelete}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>{confirmDelete ? (lang === 'fa' ? 'حذف قطعی؟' : 'Confirm?') : t('deleteFile')}</span>
-          </button>
+          {isSavedMessages && (
+            <button
+              onClick={handleDelete}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{confirmDelete ? (lang === 'fa' ? 'حذف قطعی؟' : 'Confirm?') : t('deleteFile')}</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -476,13 +483,15 @@ export function FileCard({ file }: { file: TelegramFile }) {
                 </span>
               </button>
 
-              <button
-                onClick={handleDelete}
-                className="col-span-2 flex items-center justify-center gap-2 p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>{confirmDelete ? t('deleteConfirm') : t('deleteFile')}</span>
-              </button>
+              {isSavedMessages && (
+                <button
+                  onClick={handleDelete}
+                  className="col-span-2 flex items-center justify-center gap-2 p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{confirmDelete ? t('deleteConfirm') : t('deleteFile')}</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

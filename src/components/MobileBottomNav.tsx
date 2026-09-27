@@ -15,6 +15,7 @@ export function MobileBottomNav() {
     setSelectedCategory,
     setSelectedExtension,
     setIsUploadModalOpen,
+    activePeer,
     user,
     isConnected,
     isDemoMode,
@@ -46,16 +47,18 @@ export function MobileBottomNav() {
         <span className="text-[11px] mt-1 font-semibold truncate">{t('allFiles')}</span>
       </button>
 
-      {/* 2. Center Hero Action: Instant Upload */}
-      <div className="flex-1 flex justify-center">
-        <button
-          onClick={() => setIsUploadModalOpen(true)}
-          aria-label={t('upload')}
-          className="w-13 h-13 -mt-6 rounded-2xl bg-gradient-to-tr from-blue-600 via-sky-500 to-indigo-600 text-white shadow-xl shadow-blue-500/40 flex items-center justify-center active:scale-90 transition-transform border-4 border-[#f8fafd] dark:border-[#131314] cursor-pointer shrink-0"
-        >
-          <Plus className="w-6 h-6 stroke-[2.5]" />
-        </button>
-      </div>
+      {/* 2. Center Hero Action: Instant Upload (Only in Saved Messages) */}
+      {(!activePeer || activePeer === 'me') && (
+        <div className="flex-1 flex justify-center">
+          <button
+            onClick={() => setIsUploadModalOpen(true)}
+            aria-label={t('upload')}
+            className="w-13 h-13 -mt-6 rounded-2xl bg-gradient-to-tr from-blue-600 via-sky-500 to-indigo-600 text-white shadow-xl shadow-blue-500/40 flex items-center justify-center active:scale-90 transition-transform border-4 border-[#f8fafd] dark:border-[#131314] cursor-pointer shrink-0"
+          >
+            <Plus className="w-6 h-6 stroke-[2.5]" />
+          </button>
+        </div>
+      )}
 
       {/* 3. Account Information / Profile Page */}
       <button

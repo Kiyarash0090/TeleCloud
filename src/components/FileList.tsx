@@ -35,9 +35,11 @@ export function FileList({ files }: { files: TelegramFile[] }) {
     isSelectionMode,
     toggleSelectFile,
     selectAllFiltered,
+    activePeer,
   } = useTelegram();
   const { t, lang } = useTheme();
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const isSavedMessages = !activePeer || activePeer === 'me';
 
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggeredRef = useRef(false);
@@ -55,13 +57,15 @@ export function FileList({ files }: { files: TelegramFile[] }) {
         <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mb-5">
           {t('noFilesDesc')}
         </p>
-        <button
-          onClick={() => setIsUploadModalOpen(true)}
-          className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
-        >
-          <Upload className="w-4 h-4" />
-          <span>{t('upload')}</span>
-        </button>
+        {isSavedMessages && (
+          <button
+            onClick={() => setIsUploadModalOpen(true)}
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+          >
+            <Upload className="w-4 h-4" />
+            <span>{t('upload')}</span>
+          </button>
+        )}
       </div>
     );
   }
@@ -388,13 +392,15 @@ export function FileList({ files }: { files: TelegramFile[] }) {
                         <Share2 className="w-4 h-4" />
                       </button>
 
-                      <button
-                        onClick={() => deleteFile(file.id)}
-                        title={t('deleteFile')}
-                        className="p-2 rounded-xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {isSavedMessages && (
+                        <button
+                          onClick={() => deleteFile(file.id)}
+                          title={t('deleteFile')}
+                          className="p-2 rounded-xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -26,6 +26,7 @@ import {
   Server,
   Star,
   CheckCircle2,
+  UserPlus,
 } from 'lucide-react';
 import { useTelegram } from '../context/TelegramContext';
 import { useTheme } from '../context/ThemeContext';
@@ -52,8 +53,9 @@ export function AccountPage() {
   const [photoError, setPhotoError] = useState(false);
 
   useEffect(() => {
+    setPhotoError(false);
     fetchFullUser();
-  }, [fetchFullUser]);
+  }, [fetchFullUser, user?.id]);
 
   const activeUser = user || {
     id: '784912034',
@@ -68,7 +70,11 @@ export function AccountPage() {
     dcId: 4,
   };
 
-  const photoSrc = activeUser.photoUrl || (isConnected ? '/api/telegram/profile-photo' : null);
+  const photoSrc =
+    activeUser.photoUrl ||
+    (isConnected && activeUser.id
+      ? `/api/telegram/profile-photo?uid=${encodeURIComponent(activeUser.id)}`
+      : null);
 
   const handleCopy = (text: string, fieldName: string) => {
     if (!text) return;
@@ -114,14 +120,24 @@ export function AccountPage() {
           )}
 
           {(isConnected || isDemoMode) ? (
-            <button
-              onClick={disconnectTelegram}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 text-xs font-bold active:scale-95 transition-all cursor-pointer"
-              title={t('disconnect')}
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('disconnect')}</span>
-            </button>
+            <>
+              <button
+                onClick={() => setIsLoginModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 dark:hover:bg-blue-900/50 text-blue-600 dark:text-sky-400 text-xs font-bold active:scale-95 transition-all cursor-pointer"
+                title={t('addAccount')}
+              >
+                <UserPlus className="w-4 h-4" />
+                <span className="hidden sm:inline">{t('addAccount')}</span>
+              </button>
+              <button
+                onClick={disconnectTelegram}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 text-xs font-bold active:scale-95 transition-all cursor-pointer"
+                title={t('disconnect')}
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">{t('disconnect')}</span>
+              </button>
+            </>
           ) : (
             <button
               onClick={() => setIsLoginModalOpen(true)}

@@ -17,7 +17,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
-import { useTelegram } from '../context/TelegramContext';
+import { useTelegram, useBackHandler } from '../context/TelegramContext';
 
 export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void }) {
   const { isDark, toggleTheme, lang, setLang, t } = useTheme();
@@ -45,6 +45,8 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+
+  useBackHandler(mobileSearchOpen, () => setMobileSearchOpen(false));
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -115,25 +117,75 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
         </div>
       )}
 
+      {/* Left: Mobile Menu Toggle & Desktop Context Breadcrumbs */}
+      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+        {onToggleMobileMenu && (
+          <button
+            onClick={onToggleMobileMenu}
+            className="p-2 min-w-[38px] min-h-[38px] flex items-center justify-center rounded-xl text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-95 md:hidden shrink-0 transition-all"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
 
-
-      {/* Left: Mobile Menu Trigger & Logo */}
-      <div className="flex items-center gap-2 shrink-0">
-        <button
-          onClick={onToggleMobileMenu}
-          className="md:hidden p-2 -ms-1 rounded-xl text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
-          title="Menu"
-          aria-label="Menu"
+        {/* Mobile Logo */}
+        <div
+          onClick={() => setActiveTab('files')}
+          className="flex md:hidden items-center gap-1.5 shrink-0 cursor-pointer"
         >
-          <Menu className="w-5 h-5" />
-        </button>
-
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-sky-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-            <Cloud className="w-4 h-4" />
+          <div className="w-8 h-8 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center shadow-xs overflow-hidden p-1">
+            <img src="/favicon-96x96.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
-          <span className="font-extrabold text-sm sm:text-base bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent hidden sm:inline-block">
-            TeleCloud
+        </div>
+
+        {/* Desktop Breadcrumbs Trail */}
+        <div className="hidden md:flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 dark:text-zinc-400 min-w-0">
+          <button
+            onClick={() => {
+              setActiveTab('files');
+              setSelectedCategory('all');
+              setSelectedExtension(null);
+            }}
+            className="hover:text-blue-600 dark:hover:text-sky-400 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+          >
+            <div className="w-5 h-5 rounded-md overflow-hidden flex items-center justify-center shrink-0">
+              <img src="/favicon-96x96.png" alt="Logo" className="w-full h-full object-contain" />
+            </div>
+            <span className="font-bold text-slate-800 dark:text-zinc-200">{t('appName')}</span>
+          </button>
+
+          <ChevronRight className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-600 shrink-0 rtl:rotate-180" />
+
+          {activeTab === 'account' ? (
+            <span className="font-bold text-blue-600 dark:text-sky-400 truncate">
+              {t('accountDetails')}
+            </span>
+          ) : (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-bold text-slate-900 dark:text-white truncate">
+                {getCategoryLabel()}
+              </span>
+              {selectedExtension && (
+                <span className="px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-sky-400 font-mono text-[11px] font-bold">
+                  {selectedExtension}
+                </span>
+              )}
+              <span className="text-[11px] text-slate-400 dark:text-zinc-500 font-mono tabular-nums">
+                ({filteredFiles.length})
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Search Trigger Bar */}
+        <div
+          onClick={() => setMobileSearchOpen(true)}
+          className="flex sm:hidden items-center gap-2 flex-1 min-w-0 py-1.5 px-2.5 rounded-xl bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/70 dark:border-zinc-700/60 text-slate-500 dark:text-zinc-400 cursor-pointer active:scale-[0.99] transition-all"
+        >
+          <Search className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 shrink-0" />
+          <span className="text-xs truncate font-medium">
+            {searchQuery ? searchQuery : t('searchPlaceholder')}
           </span>
         </div>
       </div>

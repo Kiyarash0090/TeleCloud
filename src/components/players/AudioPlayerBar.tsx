@@ -23,7 +23,7 @@ import {
   Share2,
   Disc3,
 } from 'lucide-react';
-import { useTelegram } from '../../context/TelegramContext';
+import { useTelegram, useBackHandler } from '../../context/TelegramContext';
 import { formatDuration, formatFileSize, getFileExtension } from '../../utils/formatters';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -57,6 +57,10 @@ export function AudioPlayerBar() {
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
   const [showRemainingTime, setShowRemainingTime] = useState(false);
+
+  useBackHandler(Boolean(activeAudio && isMobileExpanded), () => setIsMobileExpanded(false));
+  useBackHandler(Boolean(activeAudio && showPlaylist), () => setShowPlaylist(false));
+  useBackHandler(Boolean(activeAudio && showSpeedMenu), () => setShowSpeedMenu(false));
 
   const [hoverTime, setHoverTime] = useState<number | null>(null);
   const [hoverPosition, setHoverPosition] = useState<number>(0);
@@ -944,20 +948,20 @@ export function AudioPlayerBar() {
               <Shuffle className="w-4 h-4" />
             </button>
 
-            {/* Previous Track (Desktop & Tablet) */}
+            {/* Previous Track */}
             <button
               onClick={handlePrevTrack}
               disabled={audioFiles.length <= 1 && currentTime <= 3}
-              className="hidden sm:flex p-2 rounded-xl text-slate-600 hover:text-slate-900 dark:text-zinc-300 dark:hover:text-white transition disabled:opacity-30 active:scale-90"
+              className="flex p-1.5 sm:p-2 rounded-xl text-slate-600 hover:text-slate-900 dark:text-zinc-300 dark:hover:text-white transition disabled:opacity-30 active:scale-90 cursor-pointer"
               title={lang === 'fa' ? 'قبلی' : 'Previous'}
             >
               <SkipBack className="w-4 h-4 fill-current" />
             </button>
 
-            {/* -10s (Desktop) */}
+            {/* -10s */}
             <button
               onClick={() => skipTime(-10)}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition hidden lg:flex active:scale-90"
+              className="flex p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-zinc-300 dark:hover:text-white transition active:scale-90 cursor-pointer"
               title="-10s"
             >
               <RotateCcw className="w-4 h-4" />
@@ -968,7 +972,7 @@ export function AudioPlayerBar() {
               onClick={togglePlay}
               disabled={hasError}
               aria-label={isPlayingAudio ? 'Pause' : 'Play'}
-              className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-md shadow-emerald-500/25 flex items-center justify-center active:scale-90 transition hover:brightness-105 disabled:opacity-50 shrink-0 cursor-pointer"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-md shadow-emerald-500/25 flex items-center justify-center active:scale-90 transition hover:brightness-105 disabled:opacity-50 shrink-0 cursor-pointer"
             >
               {isPlayingAudio ? (
                 <Pause className="w-4 h-4 fill-current" />
@@ -977,25 +981,24 @@ export function AudioPlayerBar() {
               )}
             </button>
 
-            {/* +10s (Desktop) */}
+            {/* +10s */}
             <button
               onClick={() => skipTime(10)}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition hidden lg:flex active:scale-90"
+              className="flex p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-zinc-300 dark:hover:text-white transition active:scale-90 cursor-pointer"
               title="+10s"
             >
               <RotateCw className="w-4 h-4" />
             </button>
 
             {/* Next Track */}
-            {audioFiles.length > 1 && (
-              <button
-                onClick={handleNextTrack}
-                className="p-2 rounded-xl text-slate-600 hover:text-slate-900 dark:text-zinc-300 dark:hover:text-white transition active:scale-90"
-                title={lang === 'fa' ? 'بعدی' : 'Next'}
-              >
-                <SkipForward className="w-4 h-4 fill-current" />
-              </button>
-            )}
+            <button
+              onClick={handleNextTrack}
+              disabled={audioFiles.length <= 1}
+              className="flex p-1.5 sm:p-2 rounded-xl text-slate-600 hover:text-slate-900 dark:text-zinc-300 dark:hover:text-white transition disabled:opacity-30 active:scale-90 cursor-pointer"
+              title={lang === 'fa' ? 'بعدی' : 'Next'}
+            >
+              <SkipForward className="w-4 h-4 fill-current" />
+            </button>
 
             {/* Repeat Mode (Desktop) */}
             <button
@@ -1016,7 +1019,7 @@ export function AudioPlayerBar() {
           </div>
 
           {/* End Zone: Studio Tools & Expand/Close */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
             {/* Speed Selector (Desktop) */}
             <div className="relative hidden md:block">
               <button
@@ -1071,11 +1074,11 @@ export function AudioPlayerBar() {
               />
             </div>
 
-            {/* Playlist Queue Button (Desktop) */}
+            {/* Playlist Queue Button */}
             {audioFiles.length > 1 && (
               <button
                 onClick={() => setShowPlaylist(!showPlaylist)}
-                className={`hidden md:flex p-2 rounded-xl transition ${
+                className={`hidden sm:flex p-2 rounded-xl transition ${
                   showPlaylist
                     ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                     : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800'
@@ -1086,11 +1089,11 @@ export function AudioPlayerBar() {
               </button>
             )}
 
-            {/* Copy Link (Desktop) */}
+            {/* Copy Link */}
             <button
               onClick={handleCopyLink}
               title={t('copyDirectLink')}
-              className="hidden md:flex p-2 rounded-xl text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
+              className="hidden sm:flex p-2 rounded-xl text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
             >
               {isCopied ? (
                 <Check className="w-4 h-4 text-emerald-500" />
@@ -1099,12 +1102,12 @@ export function AudioPlayerBar() {
               )}
             </button>
 
-            {/* Download (Desktop) */}
+            {/* Download */}
             <a
               href={activeAudio.downloadUrl}
               download={activeAudio.filename}
               title={t('directDownload')}
-              className="hidden md:flex p-2 rounded-xl text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
+              className="hidden sm:flex p-2 rounded-xl text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
             >
               <Download className="w-4 h-4" />
             </a>

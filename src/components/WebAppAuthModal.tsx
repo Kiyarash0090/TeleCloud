@@ -56,7 +56,7 @@ export function WebAppAuthModal() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="admin"
-              className="w-full h-11 px-4 rounded-xl bg-slate-50 hover:bg-white focus:bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-sm text-slate-900 dark:text-zinc-100 outline-none focus:border-blue-500 transition"
+              className="w-full h-11 px-4 rounded-xl bg-slate-50 hover:bg-white focus:bg-white dark:bg-zinc-800/90 dark:hover:bg-zinc-800 dark:focus:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-sm text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 caret-blue-600 dark:caret-sky-400 outline-none focus:border-blue-500 dark:focus:border-sky-500 transition"
             />
           </div>
 
@@ -70,7 +70,7 @@ export function WebAppAuthModal() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full h-11 px-4 rounded-xl bg-slate-50 hover:bg-white focus:bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-sm text-slate-900 dark:text-zinc-100 outline-none focus:border-blue-500 transition"
+              className="w-full h-11 px-4 rounded-xl bg-slate-50 hover:bg-white focus:bg-white dark:bg-zinc-800/90 dark:hover:bg-zinc-800 dark:focus:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-sm text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 caret-blue-600 dark:caret-sky-400 outline-none focus:border-blue-500 dark:focus:border-sky-500 transition"
             />
           </div>
 

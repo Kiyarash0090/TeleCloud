@@ -18,9 +18,11 @@ const QueueContext = createContext<QueueContextType | undefined>(undefined);
 export function QueueProvider({
   children,
   onUploadSuccess,
+  activePeer = 'me',
 }: {
   children: React.ReactNode;
   onUploadSuccess?: () => void;
+  activePeer?: string;
 }) {
   const [queue, setQueue] = useState<UploadQueueItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -28,6 +30,10 @@ export function QueueProvider({
   const isProcessingRef = useRef(false);
 
   const addFilesToQueue = (files: FileList | File[]) => {
+    if (activePeer && activePeer !== 'me') {
+      return;
+    }
+
     const newItems: UploadQueueItem[] = Array.from(files).map(file => ({
       id: `task_${Date.now()}_${Math.random().toString(36).substring(5)}`,
       file,
@@ -85,6 +91,7 @@ export function QueueProvider({
     const formData = new FormData();
     formData.append('file', queuedItem.file);
     formData.append('caption', queuedItem.name);
+    formData.append('peer', 'me');
 
     const xhr = new XMLHttpRequest();
     activeXhrs.current.set(queuedItem.id, xhr);

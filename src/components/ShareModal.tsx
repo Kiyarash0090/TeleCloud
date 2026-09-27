@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { TelegramFile } from '../types';
 import { useTheme } from '../context/ThemeContext';
+import { useBackHandler } from '../context/TelegramContext';
 import { formatFileSize } from '../utils/formatters';
 
 interface ShareModalProps {
@@ -24,6 +25,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({ file, onClose }) => {
   const [copiedStream, setCopiedStream] = useState(false);
   const [copiedDownload, setCopiedDownload] = useState(false);
   const [showQr, setShowQr] = useState(false);
+
+  useBackHandler(showQr, () => setShowQr(false));
 
   const origin = window.location.origin;
   const streamUrl = file.directUrl.startsWith('http')

@@ -17,6 +17,14 @@ export interface TelegramFile {
   thumbnailUrl: string | null;
 }
 
+export interface TelegramChat {
+  id: string;
+  title: string;
+  type: 'saved' | 'channel' | 'user' | 'bot' | 'group' | 'supergroup' | 'service';
+  username?: string;
+  unreadCount?: number;
+}
+
 export interface StorageCategoryStats {
   count: number;
   size: number;
@@ -48,6 +56,20 @@ export interface TelegramUser {
   connectedAt?: string;
 }
 
+export interface SavedTelegramAccount {
+  id: string; // Telegram user ID
+  user: TelegramUser;
+  encryptedToken: string;
+  apiId?: string;
+  addedAt: number;
+  lastActiveAt: number;
+}
+
+export interface SharedApiCredentials {
+  apiId: string;
+  apiHash: string;
+}
+
 export interface UploadQueueItem {
   id: string;
   file: File;
@@ -65,4 +87,3 @@ export type ActiveTab = 'files' | 'account';
 export type ViewMode = 'grid' | 'list';
 export type SortOption = 'date_desc' | 'date_asc' | 'size_desc' | 'size_asc' | 'name_asc' | 'name_desc';
 export type Language = 'fa' | 'en';
-

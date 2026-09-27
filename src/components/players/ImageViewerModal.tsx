@@ -22,7 +22,7 @@ import {
 import { TelegramFile } from '../../types';
 import { formatFileSize, formatDate } from '../../utils/formatters';
 import { useTheme } from '../../context/ThemeContext';
-import { useTelegram } from '../../context/TelegramContext';
+import { useTelegram, useBackHandler } from '../../context/TelegramContext';
 
 export function ImageViewerModal({ 
   file, 
@@ -42,6 +42,8 @@ export function ImageViewerModal({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showFilmstrip, setShowFilmstrip] = useState(true);
+
+  useBackHandler(showFilters, () => setShowFilters(false));
 
   // Pan / Dragging position when zoomed
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });

@@ -27,7 +27,7 @@ import {
 import { TelegramFile } from '../../types';
 import { formatDuration, formatFileSize } from '../../utils/formatters';
 import { useTheme } from '../../context/ThemeContext';
-import { useTelegram } from '../../context/TelegramContext';
+import { useTelegram, useBackHandler } from '../../context/TelegramContext';
 
 export function VideoPlayerModal({ 
   file, 
@@ -40,7 +40,7 @@ export function VideoPlayerModal({
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const { t, lang } = useTheme();
-  const { files, setActiveVideo, setIsPlayingAudio, isVideoPiP, setIsVideoPiP } = useTelegram();
+  const { files, setActiveVideo, setIsPlayingAudio, isVideoPiP, setIsVideoPiP, selectedPeer } = useTelegram();
 
   // Video playlist for next/prev navigation
   const videoFiles = files.filter(f => f.category === 'videos');
@@ -67,6 +67,11 @@ export function VideoPlayerModal({
   const [showControls, setShowControls] = useState(true);
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+
+  useBackHandler(showQualityMenu || showSpeedMenu, () => {
+    setShowQualityMenu(false);
+    setShowSpeedMenu(false);
+  });
   const [isTranscodingLoading, setIsTranscodingLoading] = useState(false);
   const [retryAttempt, setRetryAttempt] = useState(0);
   const [bufferedPercent, setBufferedPercent] = useState(0);
@@ -393,12 +398,22 @@ export function VideoPlayerModal({
   }, [file.id, setIsPlayingAudio]);
 
   // Compute stream URL
-  const baseUrl = file.directUrl.startsWith('http') 
+  const isExternalDemo = file.directUrl.startsWith('http');
+  const baseUrl = isExternalDemo
     ? file.directUrl 
     : `${window.location.origin}${file.directUrl}`;
+
+  const filePeer = (() => {
+    try {
+      const urlObj = new URL(baseUrl);
+      return urlObj.searchParams.get('peer') || selectedPeer || 'me';
+    } catch {
+      return selectedPeer || 'me';
+    }
+  })();
   
-  const transcodeUrl = file.id && !String(file.id).startsWith('demo')
-    ? `/api/telegram/transcode/${file.id}/${encodeURIComponent(file.filename)}?quality=${quality}&startTime=${transcodeStartTime}&retry=${retryAttempt}`
+  const transcodeUrl = !isExternalDemo && file.id && !String(file.id).startsWith('demo')
+    ? `/api/telegram/transcode/${file.id}/${encodeURIComponent(file.filename)}?peer=${encodeURIComponent(filePeer)}&quality=${quality}&startTime=${transcodeStartTime}&retry=${retryAttempt}`
     : `/api/telegram/transcode/0?demoUrl=${encodeURIComponent(baseUrl)}&quality=${quality}&startTime=${transcodeStartTime}&retry=${retryAttempt}`;
 
   const currentVideoSrc = playbackMode === 'transcode' ? transcodeUrl : baseUrl;
@@ -906,14 +921,24 @@ export function VideoPlayerModal({
           />
 
           {/* Center Play/Pause & Skip Controls Overlay on Hover/Touch */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover/pip:opacity-100 transition-opacity bg-black/40 z-30">
-            <div className="flex items-center gap-2.5 pointer-events-auto">
+          <div
+            className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity z-30 ${
+              !isPlaying
+                ? 'opacity-100 bg-black/35'
+                : 'opacity-100 bg-black/15 md:opacity-0 md:bg-black/40 md:group-hover/pip:opacity-100'
+            }`}
+          >
+            <div
+              className={`flex items-center gap-2.5 pointer-events-auto ${
+                isPlaying ? 'md:pointer-events-none md:group-hover/pip:pointer-events-auto' : ''
+              }`}
+            >
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   skipTime(-10);
                 }}
-                className="p-1.5 rounded-full bg-black/60 text-white hover:scale-110 active:scale-95 transition cursor-pointer"
+                className="p-2 rounded-full bg-black/65 hover:bg-black/85 text-white border border-white/20 backdrop-blur-md shadow-lg hover:scale-110 active:scale-95 transition cursor-pointer flex items-center justify-center"
                 title="۱۰ ثانیه عقب"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -932,7 +957,7 @@ export function VideoPlayerModal({
                   e.stopPropagation();
                   skipTime(10);
                 }}
-                className="p-1.5 rounded-full bg-black/60 text-white hover:scale-110 active:scale-95 transition cursor-pointer"
+                className="p-2 rounded-full bg-black/65 hover:bg-black/85 text-white border border-white/20 backdrop-blur-md shadow-lg hover:scale-110 active:scale-95 transition cursor-pointer flex items-center justify-center"
                 title="۱۰ ثانیه جلو"
               >
                 <RotateCw className="w-3.5 h-3.5" />

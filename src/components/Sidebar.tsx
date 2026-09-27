@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Folder,
   Image,
@@ -10,17 +10,18 @@ import {
   Plus,
   HardDrive,
   X,
-  Cloud,
   Globe,
   Sun,
   Moon,
-
   CheckCircle2,
-  Sparkles,
-  Layers,
   ArrowRight,
   LogOut,
   UploadCloud,
+  MessageSquare,
+  ChevronDown,
+  UserPlus,
+  Loader2,
+  Users,
 } from 'lucide-react';
 import { FileCategory } from '../types';
 import { useTelegram } from '../context/TelegramContext';
@@ -36,12 +37,24 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
     setSelectedExtension,
     stats,
     setIsUploadModalOpen,
+    setIsLoginModalOpen,
     user,
+    accounts,
+    activeAccountId,
+    isSwitchingAccount,
+    switchAccount,
+    removeAccount,
     isConnected,
     isDemoMode,
-    disconnectTelegram,
+    activePeer,
+    activeChatTitle,
+    setIsChatSelectorOpen,
   } = useTelegram();
   const { t, lang, setLang, isDark, toggleTheme } = useTheme();
+
+  const [isAccountListOpen, setIsAccountListOpen] = useState(false);
+  const [switchingTargetId, setSwitchingTargetId] = useState<string | null>(null);
+  const [failedPhotos, setFailedPhotos] = useState<Record<string, boolean>>({});
 
   const categories: { id: FileCategory; label: string; icon: React.ElementType; count?: number }[] = [
     { id: 'all', label: t('allFiles'), icon: Folder, count: stats?.totalFiles },
@@ -65,8 +78,43 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
     onClose?.();
   };
 
-  const userName = user?.firstName || (isDemoMode ? (lang === 'fa' ? 'اکانت دمو' : 'Demo Account') : (lang === 'fa' ? 'کاربر مهمان' : 'Guest'));
-  const userPhoto = user?.photoUrl || (isConnected ? '/api/telegram/profile-photo' : null);
+  const handleSwitchAccount = async (accountId: string) => {
+    if (isSwitchingAccount) return;
+    setSwitchingTargetId(accountId);
+    const ok = await switchAccount(accountId);
+    setSwitchingTargetId(null);
+    if (ok) {
+      setIsAccountListOpen(false);
+      setActiveTab('files');
+      onClose?.();
+    }
+  };
+
+  const handleRemoveAccount = async (e: React.MouseEvent, accountId: string) => {
+    e.stopPropagation();
+    await removeAccount(accountId);
+  };
+
+  const handleAddAccount = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setIsLoginModalOpen(true);
+    onClose?.();
+  };
+
+  const userName =
+    user?.firstName ||
+    (isDemoMode
+      ? lang === 'fa'
+        ? 'اکانت دمو'
+        : 'Demo Account'
+      : lang === 'fa'
+      ? 'کاربر مهمان'
+      : 'Guest');
+  const userPhoto =
+    user?.photoUrl ||
+    (isConnected && user?.id
+      ? `/api/telegram/profile-photo?uid=${encodeURIComponent(user.id)}`
+      : null);
 
   return (
     <aside
@@ -94,7 +142,10 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                   {t('appName')}
                 </span>
                 {isConnected && (
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Connected & Synced" />
+                  <span
+                    className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"
+                    title="Connected & Synced"
+                  />
                 )}
               </div>
               <span className="text-[11px] text-blue-600 dark:text-sky-400 font-medium">
@@ -112,17 +163,224 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
           </button>
         </div>
 
-        {/* Primary Desktop Upload Action */}
+        {/* ================================================================= */}
+        {/* Multi-Account Switcher & Add Account Section (Top of Sidebar)     */}
+        {/* ================================================================= */}
+        <div className="mb-3.5">
+          <div className="flex items-center justify-between px-1.5 mb-1.5">
+            <span className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-blue-500" />
+              <span>{t('accounts')}</span>
+              {accounts.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-md bg-blue-500/10 text-blue-600 dark:text-sky-400 font-mono text-[10px]">
+                  {accounts.length}
+                </span>
+              )}
+            </span>
+
+            <button
+              onClick={handleAddAccount}
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-sky-400 hover:text-blue-700 dark:hover:text-sky-300 px-1.5 py-0.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+              title={t('addAccount')}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{t('addAccount')}</span>
+            </button>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50/90 dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800/90 overflow-hidden transition-all shadow-2xs">
+            {/* Active Account Trigger Row */}
+            <div
+              onClick={() => {
+                if (accounts.length > 0 || isConnected || isDemoMode) {
+                  setIsAccountListOpen((prev) => !prev);
+                } else {
+                  handleAddAccount();
+                }
+              }}
+              className="p-2.5 flex items-center justify-between gap-2 hover:bg-slate-100/80 dark:hover:bg-zinc-800/70 transition cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="relative shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-sky-500 text-white overflow-hidden flex items-center justify-center font-bold text-xs shadow-xs">
+                    {userPhoto && !failedPhotos[user?.id || 'active'] ? (
+                      <img
+                        src={userPhoto}
+                        alt={userName}
+                        onError={() =>
+                          setFailedPhotos((prev) => ({ ...prev, [user?.id || 'active']: true }))
+                        }
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span>{userName[0]?.toUpperCase() || 'U'}</span>
+                    )}
+                  </div>
+                  <span
+                    className={`absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-zinc-900 ${
+                      isConnected
+                        ? 'bg-emerald-500'
+                        : isDemoMode
+                        ? 'bg-amber-500'
+                        : 'bg-slate-400'
+                    }`}
+                  />
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-900 dark:text-zinc-100 truncate">
+                      {userName} {user?.lastName || ''}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 dark:text-zinc-400 font-mono truncate block dir-ltr text-start">
+                    {user?.username
+                      ? `@${user.username}`
+                      : user?.phone
+                      ? user.phone
+                      : isConnected
+                      ? 'Telegram Connected'
+                      : isDemoMode
+                      ? t('demoModeActive')
+                      : t('connectTelegram')}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                {isSwitchingAccount ? (
+                  <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                ) : (
+                  <ChevronDown
+                    className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                      isAccountListOpen ? 'rotate-180 text-blue-500' : ''
+                    }`}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Collapsible Multi-Account List */}
+            {isAccountListOpen && (
+              <div className="border-t border-slate-200/70 dark:border-zinc-800/80 p-1.5 space-y-1 bg-white/60 dark:bg-zinc-950/40 animate-in slide-in-from-top-1 duration-150">
+                {accounts.map((acc) => {
+                  const isCurrent =
+                    isConnected &&
+                    !isDemoMode &&
+                    (activeAccountId === acc.id || user?.id === acc.id);
+                  const isTargetSwitching = switchingTargetId === acc.id;
+                  const accPhoto =
+                    acc.user.photoUrl ||
+                    `/api/telegram/profile-photo?uid=${encodeURIComponent(acc.id)}`;
+                  const accName =
+                    `${acc.user.firstName || ''} ${acc.user.lastName || ''}`.trim() ||
+                    'Telegram User';
+
+                  return (
+                    <div
+                      key={acc.id}
+                      onClick={() => handleSwitchAccount(acc.id)}
+                      className={`group flex items-center justify-between gap-2 p-2 rounded-xl text-xs transition cursor-pointer ${
+                        isCurrent
+                          ? 'bg-blue-600/10 dark:bg-sky-500/15 text-blue-700 dark:text-sky-300 font-bold'
+                          : 'hover:bg-slate-100 dark:hover:bg-zinc-800/80 text-slate-700 dark:text-zinc-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-blue-500/15 text-blue-600 dark:text-sky-400 overflow-hidden flex items-center justify-center font-bold text-[11px] shrink-0">
+                          {!failedPhotos[acc.id] ? (
+                            <img
+                              src={accPhoto}
+                              alt={accName}
+                              onError={() =>
+                                setFailedPhotos((prev) => ({ ...prev, [acc.id]: true }))
+                              }
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span>{accName[0]?.toUpperCase() || 'U'}</span>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate text-xs leading-tight">{accName}</div>
+                          <div className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 truncate dir-ltr text-start">
+                            {acc.user.username
+                              ? `@${acc.user.username}`
+                              : acc.user.phone || `ID: ${acc.id}`}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isTargetSwitching ? (
+                          <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+                        ) : isCurrent ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                        ) : null}
+
+                        <button
+                          type="button"
+                          onClick={(e) => handleRemoveAccount(e, acc.id)}
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                          title={t('removeAccount')}
+                        >
+                          <LogOut className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Add Another Account Button inside Dropdown */}
+                <button
+                  type="button"
+                  onClick={handleAddAccount}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-blue-50/80 hover:bg-blue-100/80 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 text-blue-600 dark:text-sky-400 text-xs font-bold transition cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>{t('addAccount')}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Chat / Channel / Bot Switcher Button */}
         <button
           onClick={() => {
-            setIsUploadModalOpen(true);
+            setIsChatSelectorOpen(true);
             onClose?.();
           }}
-          className="w-full mb-5 py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] cursor-pointer"
+          className="w-full mb-3 py-2.5 px-3.5 rounded-2xl bg-slate-100 dark:bg-zinc-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-slate-700 dark:text-zinc-200 hover:text-blue-600 dark:hover:text-blue-400 font-bold text-xs flex items-center justify-between transition-all border border-slate-200/80 dark:border-zinc-700/80 cursor-pointer shadow-2xs"
         >
-          <UploadCloud className="w-5 h-5 stroke-[2.2]" />
-          <span>{t('upload')}</span>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <MessageSquare className="w-4 h-4 text-blue-500 shrink-0" />
+            <span className="truncate">
+              {activeChatTitle || (lang === 'fa' ? 'پیام‌های ذخیره‌شده' : 'Saved Messages')}
+            </span>
+          </div>
+          <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
         </button>
+
+        {/* Primary Desktop Upload Action (Strictly in Saved Messages) */}
+        {!activePeer || activePeer === 'me' ? (
+          <button
+            onClick={() => {
+              setIsUploadModalOpen(true);
+              onClose?.();
+            }}
+            className="w-full mb-5 py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] cursor-pointer"
+          >
+            <UploadCloud className="w-5 h-5 stroke-[2.2]" />
+            <span>{t('upload')}</span>
+          </button>
+        ) : (
+          <div className="w-full mb-5 py-2.5 px-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 text-amber-700 dark:text-amber-300 text-[11px] font-bold flex items-center justify-center gap-2">
+            <span>
+              {lang === 'fa' ? 'حالت فقط خواندنی (بدون آپلود)' : 'Read-Only Mode (No Upload)'}
+            </span>
+          </div>
+        )}
 
         {/* Section Label */}
         <div className="px-2 mb-2 text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">
@@ -145,7 +403,11 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-600 dark:text-sky-400' : 'opacity-70'}`} />
+                  <Icon
+                    className={`w-4 h-4 shrink-0 ${
+                      isActive ? 'text-blue-600 dark:text-sky-400' : 'opacity-70'
+                    }`}
+                  />
                   <span className="truncate">{cat.label}</span>
                 </div>
                 {cat.count !== undefined && cat.count > 0 && (
@@ -163,8 +425,6 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
             );
           })}
         </nav>
-
-
       </div>
 
       {/* Bottom Area: Storage Metrics & User Card */}
@@ -213,20 +473,31 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
           </div>
 
           <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500 mt-1.5 font-mono">
-            <span>{stats?.totalFiles || 0} {lang === 'fa' ? 'فایل ابری' : 'cloud files'}</span>
-            <span className="text-emerald-500 font-semibold">{lang === 'fa' ? 'نامحدود' : 'Unlimited'}</span>
+            <span>
+              {stats?.totalFiles || 0} {lang === 'fa' ? 'فایل ابری' : 'cloud files'}
+            </span>
+            <span className="text-emerald-500 font-semibold">
+              {lang === 'fa' ? 'نامحدود' : 'Unlimited'}
+            </span>
           </div>
         </div>
 
-        {/* Telegram User Mini-Card */}
+        {/* Telegram User Profile Details Link Card */}
         <div
           onClick={handleSelectAccount}
           className="flex items-center justify-between p-2 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 hover:border-blue-400/50 transition-all cursor-pointer group"
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-600 dark:text-sky-400 overflow-hidden flex items-center justify-center font-bold text-xs shrink-0">
-              {userPhoto ? (
-                <img src={userPhoto} alt={userName} className="w-full h-full object-cover" />
+              {userPhoto && !failedPhotos[user?.id || 'active'] ? (
+                <img
+                  src={userPhoto}
+                  alt={userName}
+                  onError={() =>
+                    setFailedPhotos((prev) => ({ ...prev, [user?.id || 'active']: true }))
+                  }
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 userName[0]?.toUpperCase() || 'U'
               )}
@@ -236,7 +507,13 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                 {userName}
               </span>
               <span className="text-[10px] text-slate-400 font-mono truncate block">
-                {user?.username ? `@${user.username}` : (isConnected ? 'Telegram User' : (isDemoMode ? 'Demo Mode' : 'Guest'))}
+                {user?.username
+                  ? `@${user.username}`
+                  : isConnected
+                  ? 'Telegram User'
+                  : isDemoMode
+                  ? 'Demo Mode'
+                  : 'Guest'}
               </span>
             </div>
           </div>
@@ -247,3 +524,4 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
     </aside>
   );
 }
+

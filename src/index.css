@@ -8,6 +8,30 @@
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior-y: none;
   }
+
+  /* Prevent browser autofill from forcing white background with unreadable text in dark mode */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus {
+    -webkit-text-fill-color: #0f172a;
+    -webkit-box-shadow: 0 0 0px 1000px #ffffff inset;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  .dark input:-webkit-autofill,
+  .dark input:-webkit-autofill:hover,
+  .dark input:-webkit-autofill:focus,
+  .dark textarea:-webkit-autofill,
+  .dark textarea:-webkit-autofill:hover,
+  .dark textarea:-webkit-autofill:focus {
+    -webkit-text-fill-color: #f4f4f5;
+    -webkit-box-shadow: 0 0 0px 1000px #18181b inset;
+    caret-color: #38bdf8;
+    transition: background-color 5000s ease-in-out 0s;
+  }
 }
 
 /* Hide scrollbars on horizontal touch carousels while preserving momentum scroll */
