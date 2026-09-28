@@ -1,10 +1,14 @@
+import http from 'http';
+import https from 'https';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import multer from 'multer';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
+
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
 import { Api } from 'telegram/tl/index.js';
@@ -1015,7 +1019,7 @@ app.get('/api/telegram/chats', async (req: Request, res: Response) => {
 // 3. Saved Messages & Chat Cloud File Operations
 // ----------------------------------------------------
 
-// Fetch all media/documents from selected peer chat/channel/bot
+// Fetch all media/documents from selected peer chat/channel/bot with deep pagination
 app.get('/api/telegram/files', async (req: Request, res: Response) => {
   try {
     const sessionId = getSessionId(req);
@@ -1025,117 +1029,201 @@ app.get('/api/telegram/files', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Not connected to Telegram' });
     }
 
-    const limit = Math.min(Number(req.query.limit) || 100, 300);
-    const offsetId = Number(req.query.offsetId) || 0;
+    const limit = Math.min(Number(req.query.limit) || 250, 500);
+    let currentOffsetId = Number(req.query.offsetId) || 0;
     const category = (req.query.category as string) || 'all';
     const searchQuery = (req.query.search as string)?.toLowerCase() || '';
     const peerParam = (req.query.peer as string) || 'me';
     const peer = getTargetPeer(peerParam);
-
-    // Fetch messages from selected peer
-    const messages = await client.getMessages(peer, {
-      limit,
-      offsetId,
-    });
+    const currentUid = activeSessions.get(sessionId)?.user?.id || sessionId;
 
     const files: any[] = [];
+    const seenIds = new Set<number>();
+    let hasMore = false;
+    let totalFetchedMessages = 0;
+    const maxInternalIterations = 3; // Scan up to 3 chunks if a channel has many text-only posts
 
-    for (const msg of messages) {
-      if (!msg || !msg.media) continue;
+    for (let step = 0; step < maxInternalIterations; step++) {
+      const getMessagesParams: any = { limit };
+      if (currentOffsetId > 0) {
+        getMessagesParams.offsetId = currentOffsetId;
+      }
 
-      let filename = 'file';
-      let mimeType = 'application/octet-stream';
-      let size = 0;
-      let hasThumb = false;
-      let duration = 0;
-      let width = 0;
-      let height = 0;
-      let fileType = 'unknown';
+      const messages = await client.getMessages(peer, getMessagesParams);
+      if (!messages || messages.length === 0) {
+        hasMore = false;
+        currentOffsetId = 0;
+        break;
+      }
 
-      // 1. Document (Files, audio, video as doc, archives, etc.)
-      if (msg.media instanceof Api.MessageMediaDocument && msg.media.document instanceof Api.Document) {
-        const doc = msg.media.document;
-        size = Number(doc.size || 0);
-        mimeType = doc.mimeType || 'application/octet-stream';
-        hasThumb = Boolean(doc.thumbs && doc.thumbs.length > 0);
+      totalFetchedMessages += messages.length;
+      const oldestMsg = messages[messages.length - 1];
+      const nextId = oldestMsg && typeof oldestMsg.id === 'number' ? oldestMsg.id : 0;
 
-        for (const attr of doc.attributes) {
-          if (attr instanceof Api.DocumentAttributeFilename) {
-            filename = attr.fileName;
-          } else if (attr instanceof Api.DocumentAttributeVideo) {
-            duration = attr.duration;
-            width = attr.w;
-            height = attr.h;
-            fileType = 'video';
-          } else if (attr instanceof Api.DocumentAttributeAudio) {
-            duration = attr.duration;
-            fileType = 'audio';
-            if (attr.title) {
-              filename = `${attr.performer ? attr.performer + ' - ' : ''}${attr.title}.${mimeType.split('/')[1] || 'mp3'}`;
+      for (const msg of messages) {
+        if (!msg || !msg.media || seenIds.has(msg.id)) continue;
+
+        let filename = '';
+        let mimeType = 'application/octet-stream';
+        let size = 0;
+        let hasThumb = false;
+        let duration = 0;
+        let width = 0;
+        let height = 0;
+        let fileType = 'unknown';
+
+        // 1. Document (Files, audio, video as doc, voice, video notes, archives, etc.)
+        if (
+          (msg.media instanceof Api.MessageMediaDocument || (msg.media as any)?.className === 'MessageMediaDocument') &&
+          ((msg.media as any)?.document instanceof Api.Document || (msg.media as any)?.document?.className === 'Document')
+        ) {
+          const doc = (msg.media as any).document;
+          size = Number(doc.size || 0);
+          mimeType = doc.mimeType || 'application/octet-stream';
+          hasThumb = Boolean(doc.thumbs && doc.thumbs.length > 0);
+
+          for (const attr of doc.attributes || []) {
+            if (attr instanceof Api.DocumentAttributeFilename || attr?.className === 'DocumentAttributeFilename') {
+              filename = attr.fileName;
+            } else if (attr instanceof Api.DocumentAttributeVideo || attr?.className === 'DocumentAttributeVideo') {
+              duration = attr.duration || 0;
+              width = attr.w || 0;
+              height = attr.h || 0;
+              fileType = 'video';
+            } else if (attr instanceof Api.DocumentAttributeAudio || attr?.className === 'DocumentAttributeAudio') {
+              duration = attr.duration || 0;
+              fileType = 'audio';
+              if (attr.title && !filename) {
+                const subExt = (mimeType.split('/')[1] || 'mp3').replace('mpeg', 'mp3');
+                filename = `${attr.performer ? attr.performer + ' - ' : ''}${attr.title}.${subExt}`;
+              }
+            } else if (attr instanceof Api.DocumentAttributeImageSize || attr?.className === 'DocumentAttributeImageSize') {
+              width = attr.w || 0;
+              height = attr.h || 0;
+              fileType = 'image';
+            } else if (attr instanceof Api.DocumentAttributeAnimated || attr?.className === 'DocumentAttributeAnimated') {
+              fileType = 'video';
             }
-          } else if (attr instanceof Api.DocumentAttributeImageSize) {
-            width = attr.w;
-            height = attr.h;
-            fileType = 'image';
+          }
+
+          // Skip stickers unless they are regular files
+          const isSticker = (doc.attributes || []).some(
+            (a: any) => a instanceof Api.DocumentAttributeSticker || a?.className === 'DocumentAttributeSticker'
+          );
+          if (isSticker && mimeType === 'application/x-tgsticker') {
+            continue;
+          }
+
+          if (!filename) {
+            const rawSub = (mimeType.split('/')[1] || '').split(';')[0].trim();
+            const extMap: Record<string, string> = {
+              mp4: 'mp4',
+              'x-matroska': 'mkv',
+              quicktime: 'mov',
+              webm: 'webm',
+              mpeg: 'mp3',
+              ogg: 'ogg',
+              opus: 'ogg',
+              mp3: 'mp3',
+              wav: 'wav',
+              flac: 'flac',
+              pdf: 'pdf',
+              zip: 'zip',
+              'x-rar-compressed': 'rar',
+              'x-7z-compressed': '7z',
+              jpeg: 'jpg',
+              png: 'png',
+              gif: 'gif',
+            };
+            const fallbackExt =
+              extMap[rawSub] ||
+              (fileType === 'video' ? 'mp4' : fileType === 'audio' ? 'mp3' : fileType === 'image' ? 'jpg' : rawSub || 'bin');
+            const prefix = fileType !== 'unknown' ? fileType : 'file';
+            filename = `${prefix}_${msg.id}.${fallbackExt}`;
           }
         }
-      }
-      // 2. Photo
-      else if (msg.media instanceof Api.MessageMediaPhoto && msg.media.photo instanceof Api.Photo) {
-        const photo = msg.media.photo;
-        hasThumb = true;
-        fileType = 'image';
-        mimeType = 'image/jpeg';
-        filename = `photo_${msg.id}.jpg`;
-        // Estimate size from largest size item
-        const largestSize = photo.sizes[photo.sizes.length - 1];
-        if ('size' in largestSize && typeof largestSize.size === 'number') {
-          size = largestSize.size;
-        } else if ('sizes' in largestSize && Array.isArray(largestSize.sizes)) {
-          size = largestSize.sizes[largestSize.sizes.length - 1] || 150000;
+        // 2. Photo
+        else if (
+          (msg.media instanceof Api.MessageMediaPhoto || (msg.media as any)?.className === 'MessageMediaPhoto') &&
+          ((msg.media as any)?.photo instanceof Api.Photo || (msg.media as any)?.photo?.className === 'Photo')
+        ) {
+          const photo = (msg.media as any).photo;
+          hasThumb = true;
+          fileType = 'image';
+          mimeType = 'image/jpeg';
+          filename = `photo_${msg.id}.jpg`;
+          const sizes = photo.sizes || [];
+          const largestSize = sizes[sizes.length - 1];
+          if (largestSize && 'size' in largestSize && typeof largestSize.size === 'number') {
+            size = largestSize.size;
+          } else if (largestSize && 'sizes' in largestSize && Array.isArray(largestSize.sizes)) {
+            size = largestSize.sizes[largestSize.sizes.length - 1] || 150000;
+          } else {
+            size = 250000;
+          }
         } else {
-          size = 250000; // estimated fallback
+          continue;
         }
-      } else {
-        continue;
+
+        const accurateMime = getAccurateMimeType(filename, mimeType);
+        const fileCategory = getCategoryFromMimeAndExt(accurateMime, filename);
+
+        if (category !== 'all' && fileCategory !== category) {
+          continue;
+        }
+
+        if (
+          searchQuery &&
+          !filename.toLowerCase().includes(searchQuery) &&
+          !(msg.message && msg.message.toLowerCase().includes(searchQuery))
+        ) {
+          continue;
+        }
+
+        seenIds.add(msg.id);
+        files.push({
+          id: msg.id,
+          filename,
+          caption: msg.message || '',
+          mimeType: accurateMime,
+          size,
+          category: fileCategory,
+          hasThumb,
+          date: msg.date * 1000,
+          duration,
+          width,
+          height,
+          originPeer: peerParam,
+          directUrl: `/api/telegram/stream/${msg.id}/${encodeURIComponent(filename)}?peer=${encodeURIComponent(peerParam)}&uid=${encodeURIComponent(currentUid)}`,
+          downloadUrl: `/api/telegram/download/${msg.id}/${encodeURIComponent(filename)}?peer=${encodeURIComponent(peerParam)}&uid=${encodeURIComponent(currentUid)}`,
+          thumbnailUrl: hasThumb
+            ? `/api/telegram/thumbnail/${msg.id}?peer=${encodeURIComponent(peerParam)}&uid=${encodeURIComponent(currentUid)}`
+            : null,
+        });
       }
 
-      const accurateMime = getAccurateMimeType(filename, mimeType);
-      const fileCategory = getCategoryFromMimeAndExt(accurateMime, filename);
-
-      // Filtering
-      if (category !== 'all' && fileCategory !== category) {
-        continue;
+      if (!nextId || nextId <= 1 || nextId === currentOffsetId || messages.length < 5) {
+        hasMore = false;
+        currentOffsetId = 0;
+        break;
       }
 
-      if (searchQuery && !filename.toLowerCase().includes(searchQuery) && !(msg.message && msg.message.toLowerCase().includes(searchQuery))) {
-        continue;
-      }
+      currentOffsetId = nextId;
+      hasMore = true;
 
-      const currentUid = activeSessions.get(sessionId)?.user?.id || sessionId;
-      files.push({
-        id: msg.id,
-        filename,
-        caption: msg.message || '',
-        mimeType: accurateMime,
-        size,
-        category: fileCategory,
-        hasThumb,
-        date: msg.date * 1000,
-        duration,
-        width,
-        height,
-        directUrl: `/api/telegram/stream/${msg.id}/${encodeURIComponent(filename)}?peer=${encodeURIComponent(peerParam)}&uid=${encodeURIComponent(currentUid)}`,
-        downloadUrl: `/api/telegram/download/${msg.id}/${encodeURIComponent(filename)}?peer=${encodeURIComponent(peerParam)}&uid=${encodeURIComponent(currentUid)}`,
-        thumbnailUrl: hasThumb ? `/api/telegram/thumbnail/${msg.id}?peer=${encodeURIComponent(peerParam)}&uid=${encodeURIComponent(currentUid)}` : null,
-      });
+      // If we already gathered a good batch of media files, return immediately for fast UI response
+      if (files.length >= 80) {
+        break;
+      }
     }
 
     return res.json({
       success: true,
       files,
       count: files.length,
-      nextOffsetId: messages.length > 0 && messages[messages.length - 1] ? messages[messages.length - 1].id : 0,
+      nextOffsetId: hasMore ? currentOffsetId : 0,
+      hasMore,
+      scannedMessages: totalFetchedMessages,
     });
   } catch (err: any) {
     console.error('Error fetching files from Telegram:', err);
@@ -1204,6 +1292,713 @@ app.get('/api/telegram/stats', async (req: Request, res: Response) => {
     return res.status(500).json({ error: err.message || 'Failed to calculate stats' });
   }
 });
+
+// Helper to parse Telegram URL
+function parseTelegramLinkInfo(linkStr: string): { peerParam: string; peer: any; messageId: number; isPrivate: boolean } | null {
+  try {
+    const clean = linkStr.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+    
+    // 1. Match t.me/c/1234567890/123
+    const privateMatch = clean.match(/t\.me\/c\/(\d+)\/(\d+)/i);
+    if (privateMatch) {
+      const channelNum = privateMatch[1];
+      const msgId = parseInt(privateMatch[2], 10);
+      const fullChannelId = channelNum.startsWith('-100') ? channelNum : `-100${channelNum}`;
+      return { peerParam: fullChannelId, peer: bigInt(fullChannelId), messageId: msgId, isPrivate: true };
+    }
+
+    // 2. Match t.me/channel_username/123 or telegram.me/username/123
+    const publicMatch = clean.match(/(?:t\.me|telegram\.me|telegram\.dog)\/([a-zA-Z0-9_]+)\/(\d+)/i);
+    if (publicMatch) {
+      const username = publicMatch[1];
+      const msgId = parseInt(publicMatch[2], 10);
+      return { peerParam: `@${username}`, peer: `@${username}`, messageId: msgId, isPrivate: false };
+    }
+
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ----------------------------------------------------
+// Parse and inspect any Telegram message link for media
+// ----------------------------------------------------
+app.post('/api/telegram/parse-link', async (req: Request, res: Response) => {
+  try {
+    const { link } = req.body;
+    if (!link || typeof link !== 'string' || !link.trim()) {
+      return res.status(400).json({ success: false, error: 'لینک معتبری وارد نشده است.' });
+    }
+
+    const cleanLink = link.trim();
+    const parsed = parseTelegramLinkInfo(cleanLink);
+
+    // If NOT a t.me link, check if it is a Direct Download URL (HTTP/HTTPS)
+    if (!parsed) {
+      if (cleanLink.startsWith('http://') || cleanLink.startsWith('https://')) {
+        try {
+          // Inspect direct URL via HEAD request
+          let filename = 'downloaded_file';
+          let mimeType = 'application/octet-stream';
+          let size = 0;
+
+          try {
+            const headRes = await fetch(cleanLink, { method: 'HEAD', redirect: 'follow' });
+            if (headRes.ok) {
+              const ct = headRes.headers.get('content-type');
+              if (ct) mimeType = ct.split(';')[0].trim();
+
+              const cl = headRes.headers.get('content-length');
+              if (cl) size = parseInt(cl, 10) || 0;
+
+              const cd = headRes.headers.get('content-disposition');
+              if (cd && cd.includes('filename=')) {
+                const match = cd.match(/filename=["']?([^"';]+)["']?/i);
+                if (match && match[1]) filename = match[1].trim();
+              }
+            }
+          } catch (headErr) {
+            // If HEAD fails, proceed with URL pathname
+          }
+
+          if (filename === 'downloaded_file') {
+            try {
+              const urlObj = new URL(cleanLink);
+              const pathBase = path.basename(urlObj.pathname);
+              if (pathBase && pathBase.includes('.')) {
+                filename = decodeURIComponent(pathBase);
+              }
+            } catch (e) {}
+          }
+
+          const accurateMime = getAccurateMimeType(filename, mimeType);
+          const fileCategory = getCategoryFromMimeAndExt(accurateMime, filename);
+
+          const directMedia = {
+            id: Date.now(),
+            isDirectUrl: true,
+            filename,
+            caption: `فایل استخراج‌شده از لینک مستقیم:\n${cleanLink}`,
+            mimeType: accurateMime,
+            size,
+            category: fileCategory,
+            hasThumb: false,
+            date: Date.now(),
+            telegramLink: cleanLink,
+            directUrl: cleanLink,
+            downloadUrl: cleanLink,
+            thumbnailUrl: accurateMime.startsWith('image/') ? cleanLink : null,
+          };
+
+          return res.json({ success: true, media: directMedia, isDirectUrl: true });
+        } catch (directErr: any) {
+          return res.status(400).json({
+            success: false,
+            error: 'امکان بررسی لینک مستقیم وجود ندارد یا لینک غیرقابل دسترس است.',
+          });
+        }
+      }
+
+      return res.status(400).json({
+        success: false,
+        error: 'فرمت لینک وارد شده صحیح نیست. لطفاً یک لینک تلگرام (t.me) یا لینک مستقیم دانلود (http/https) وارد کنید.',
+      });
+    }
+
+    const sessionId = getSessionId(req);
+    const client = getActiveClient(sessionId);
+    const currentUid = activeSessions.get(sessionId)?.user?.id || sessionId;
+
+
+    // If client is connected, fetch real message via MTProto
+    if (client) {
+      try {
+        const messages = await client.getMessages(parsed.peer, { ids: [parsed.messageId] });
+        const msg = messages?.[0];
+
+        if (!msg) {
+          return res.status(404).json({
+            success: false,
+            error: 'پیام مورد نظر یافت نشد یا دسترسی به آن امکان‌پذیر نیست.',
+          });
+        }
+
+        if (!msg.media) {
+          return res.status(404).json({
+            success: false,
+            error: 'این لینک حاوی هیچ فایل یا رسانه‌ای (عکس، ویدیو، موزیک یا سند) نیست.',
+          });
+        }
+
+        let filename = 'file';
+        let mimeType = 'application/octet-stream';
+        let size = 0;
+        let hasThumb = false;
+        let duration = 0;
+        let width = 0;
+        let height = 0;
+
+        if (msg.media instanceof Api.MessageMediaDocument && msg.media.document instanceof Api.Document) {
+          const doc = msg.media.document;
+          size = Number(doc.size || 0);
+          mimeType = doc.mimeType || 'application/octet-stream';
+          hasThumb = Boolean(doc.thumbs && doc.thumbs.length > 0);
+
+          for (const attr of doc.attributes) {
+            if (attr instanceof Api.DocumentAttributeFilename) {
+              filename = attr.fileName;
+            } else if (attr instanceof Api.DocumentAttributeVideo) {
+              duration = attr.duration;
+              width = attr.w;
+              height = attr.h;
+            } else if (attr instanceof Api.DocumentAttributeAudio) {
+              duration = attr.duration;
+              if (attr.title) {
+                filename = `${attr.performer ? attr.performer + ' - ' : ''}${attr.title}.${mimeType.split('/')[1] || 'mp3'}`;
+              }
+            } else if (attr instanceof Api.DocumentAttributeImageSize) {
+              width = attr.w;
+              height = attr.h;
+            }
+          }
+        } else if (msg.media instanceof Api.MessageMediaPhoto && msg.media.photo instanceof Api.Photo) {
+          hasThumb = true;
+          mimeType = 'image/jpeg';
+          filename = `photo_${msg.id}.jpg`;
+          const photo = msg.media.photo;
+          const largestSize = photo.sizes[photo.sizes.length - 1];
+          if ('size' in largestSize && typeof largestSize.size === 'number') {
+            size = largestSize.size;
+          } else {
+            size = 250000;
+          }
+        } else {
+          return res.status(404).json({
+            success: false,
+            error: 'فرمت رسانه این پیام پشتیبانی نمی‌شود.',
+          });
+        }
+
+        const accurateMime = getAccurateMimeType(filename, mimeType);
+        const fileCategory = getCategoryFromMimeAndExt(accurateMime, filename);
+
+        const media = {
+          id: msg.id,
+          filename,
+          caption: msg.message || '',
+          mimeType: accurateMime,
+          size,
+          category: fileCategory,
+          hasThumb,
+          date: msg.date * 1000,
+          duration,
+          width,
+          height,
+          telegramLink: link.trim(),
+          peerParam: parsed.peerParam,
+          chatTitle: typeof parsed.peer === 'string' ? parsed.peer : 'کانال تلگرام',
+          directUrl: `/api/telegram/stream/${msg.id}/${encodeURIComponent(filename)}?peer=${encodeURIComponent(parsed.peerParam)}&uid=${encodeURIComponent(currentUid)}`,
+          downloadUrl: `/api/telegram/download/${msg.id}/${encodeURIComponent(filename)}?peer=${encodeURIComponent(parsed.peerParam)}&uid=${encodeURIComponent(currentUid)}`,
+          thumbnailUrl: hasThumb ? `/api/telegram/thumbnail/${msg.id}?peer=${encodeURIComponent(parsed.peerParam)}&uid=${encodeURIComponent(currentUid)}` : null,
+        };
+
+        return res.json({ success: true, media });
+      } catch (mtprotoErr: any) {
+        console.error('MTProto link fetch error:', mtprotoErr);
+      }
+    }
+
+    // Fallback or Demo Mode link resolution
+    // Generates a mock media object matching the requested link so users can test preview/copy/download
+    const linkHash = Math.abs(link.split('').reduce((acc, char) => (acc << 5) - acc + char.charCodeAt(0), 0));
+    const isVideo = link.includes('video') || linkHash % 3 === 0;
+    const isAudio = link.includes('audio') || link.includes('music') || linkHash % 3 === 1;
+
+    let demoFileName = isVideo ? 'Telegram_Video_Stream.mp4' : isAudio ? 'Telegram_Audio_Track.mp3' : 'Telegram_Media_Photo.jpg';
+    let demoMime = isVideo ? 'video/mp4' : isAudio ? 'audio/mpeg' : 'image/jpeg';
+    let demoCategory = isVideo ? 'videos' : isAudio ? 'audio' : 'images';
+    let demoSize = isVideo ? 42500000 : isAudio ? 8400000 : 1200000;
+    let demoDirectUrl = isVideo 
+      ? 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4' 
+      : isAudio 
+      ? 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
+      : 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop';
+
+    const demoMedia = {
+      id: parsed.messageId || 101,
+      filename: demoFileName,
+      caption: `رسانه استخراج‌شده از لینک تلگرام (${parsed.peerParam})\n${link}`,
+      mimeType: demoMime,
+      size: demoSize,
+      category: demoCategory,
+      hasThumb: true,
+      date: Date.now(),
+      duration: isVideo ? 120 : isAudio ? 240 : undefined,
+      width: isVideo ? 1280 : undefined,
+      height: isVideo ? 720 : undefined,
+      telegramLink: link.trim(),
+      peerParam: parsed.peerParam,
+      chatTitle: parsed.peerParam,
+      directUrl: demoDirectUrl,
+      downloadUrl: demoDirectUrl,
+      thumbnailUrl: isVideo ? 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop' : null,
+      isDemoFallback: true,
+    };
+
+    return res.json({
+      success: true,
+      media: demoMedia,
+      notice: !client ? 'برای دسترسی مستقیم با اکانت خود، لاگین کنید.' : undefined,
+    });
+  } catch (err: any) {
+    console.error('Parse link error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'خطا در بررسی لینک تلگرام' });
+  }
+});
+
+// ----------------------------------------------------
+// Real-time Remote Transfer: Stream direct URL content into Telegram Saved Messages ('me')
+// ----------------------------------------------------
+interface RemoteTask {
+  id: string;
+  url: string;
+  filename: string;
+  caption: string;
+  totalSize: number;
+  loadedSize: number;
+  progress: number; // 0..100
+  speed: string;
+  speedBytesPerSec: number;
+  phase: string;
+  status: string;
+  messageId?: number;
+  error?: string;
+  startedAt: number;
+}
+
+const remoteTasksMap = new Map<string, RemoteTask>();
+
+function formatSpeedBytes(bytesPerSec: number): string {
+  if (bytesPerSec <= 0) return '0 B/s';
+  if (bytesPerSec < 1024) return `${bytesPerSec.toFixed(0)} B/s`;
+  if (bytesPerSec < 1024 * 1024) return `${(bytesPerSec / 1024).toFixed(1)} KB/s`;
+  return `${(bytesPerSec / (1024 * 1024)).toFixed(1)} MB/s`;
+}
+
+// 1. Start Async Remote Upload Task
+app.post('/api/telegram/start-remote-upload', async (req: Request, res: Response) => {
+  try {
+    const { url, filename, caption } = req.body;
+    if (!url || typeof url !== 'string' || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+      return res.status(400).json({ success: false, error: 'لینک مستقیم معتبر وارد نشده است.' });
+    }
+
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    let finalName = filename || 'downloaded_file';
+    if (finalName === 'downloaded_file') {
+      try {
+        const urlObj = new URL(url);
+        const base = path.basename(urlObj.pathname);
+        if (base && base.includes('.')) finalName = decodeURIComponent(base);
+      } catch (e) {}
+    }
+
+    const task: RemoteTask = {
+      id: taskId,
+      url,
+      filename: finalName,
+      caption: caption || `فایل دریافت شده از لینک مستقیم:\n${url}`,
+      totalSize: 0,
+      loadedSize: 0,
+      progress: 0,
+      speed: '0 MB/s',
+      speedBytesPerSec: 0,
+      phase: 'downloading',
+      status: 'running',
+      startedAt: Date.now(),
+    };
+
+    remoteTasksMap.set(taskId, task);
+
+    const sessionId = getSessionId(req);
+    const client = getActiveClient(sessionId);
+
+    // Run execution in background without blocking response
+    executeRemoteTransfer(taskId, client, url, finalName, caption).catch((err) => {
+      console.error('Remote transfer background error:', err);
+      const t = remoteTasksMap.get(taskId);
+      if (t) {
+        t.status = 'failed';
+        t.phase = 'failed';
+        t.error = err.message || 'خطا در دریافت و ارسال فایل';
+      }
+    });
+
+    return res.json({ success: true, taskId });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'خطا در ایجاد ساختار دانلود' });
+  }
+});
+
+
+// List all active or recent remote tasks
+app.get('/api/telegram/remote-uploads', (req: Request, res: Response) => {
+  const tasks = Array.from(remoteTasksMap.values()).map((task) => ({
+    id: task.id,
+    filename: task.filename,
+    totalSize: task.totalSize,
+    loadedSize: task.loadedSize,
+    progress: task.progress,
+    speed: task.speed,
+    phase: task.phase,
+    status: task.status,
+    messageId: task.messageId,
+    error: task.error,
+    startedAt: task.startedAt,
+  }));
+  return res.json({ success: true, tasks });
+});
+
+// 2. Cancel Remote Upload Task
+app.post(['/api/telegram/cancel-remote-upload/:taskId', '/api/telegram/cancel-remote-upload'], (req: Request, res: Response) => {
+  const taskId = req.params.taskId || req.body?.taskId;
+  if (!taskId) {
+    return res.status(400).json({ success: false, error: 'Task ID required' });
+  }
+
+  const task = remoteTasksMap.get(taskId);
+  if (task) {
+    task.status = 'failed';
+    task.phase = 'failed';
+    task.error = 'انتقال فایل توسط کاربر لغو شد.';
+    return res.json({ success: true, message: 'انتقال لغو شد.' });
+  }
+
+  return res.status(404).json({ success: false, error: 'تسک یافت نشد.' });
+});
+
+// Background Transfer Execution Helper
+async function executeRemoteTransfer(
+  taskId: string,
+  client: TelegramClient | null,
+  url: string,
+  filename: string,
+  caption?: string
+) {
+  const task = remoteTasksMap.get(taskId);
+  if (!task) return;
+
+  // Handle Demo Mode / Unconnected
+  if (!client) {
+    const simulatedTotal = 35 * 1024 * 1024;
+    task.totalSize = simulatedTotal;
+
+    const startTime = Date.now();
+    for (let i = 1; i <= 10; i++) {
+      if (task.status === 'failed' || task.phase === 'failed') return;
+      await new Promise((r) => setTimeout(r, 220));
+      if (task.status === 'failed' || task.phase === 'failed') return;
+      const elapsed = (Date.now() - startTime) / 1000 || 0.1;
+      task.loadedSize = (simulatedTotal / 10) * i;
+      task.progress = i * 10;
+      const bytesPerSec = task.loadedSize / elapsed;
+      task.speedBytesPerSec = bytesPerSec;
+      task.speed = formatSpeedBytes(bytesPerSec);
+      if (i === 5) {
+        task.phase = 'uploading';
+      }
+    }
+
+    task.progress = 100;
+    task.status = 'completed';
+    task.phase = 'completed';
+    task.messageId = Date.now();
+    return;
+  }
+
+
+async function downloadStreamToFile(
+  targetUrl: string,
+  destPath: string,
+  task: RemoteTask,
+  maxRedirects = 10
+): Promise<{ downloadedBytes: number; contentType: string; totalSize: number }> {
+  return new Promise((resolve, reject) => {
+    function doFetch(currentUrl: string, redirectsLeft: number) {
+      if (redirectsLeft <= 0) {
+        return reject(new Error('تعداد تغییر مسیرها (Redirects) بیش از حد مجاز است'));
+      }
+
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(currentUrl);
+      } catch (e) {
+        return reject(new Error('آدرس URL نامعتبر است'));
+      }
+
+      const client = parsedUrl.protocol === 'https:' ? https : http;
+      const req = client.get(
+        currentUrl,
+        {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            Accept: '*/*',
+            'Accept-Encoding': 'identity',
+            Connection: 'keep-alive',
+          },
+          timeout: 120000,
+        },
+        (res) => {
+          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            const nextUrl = new URL(res.headers.location, currentUrl).toString();
+            res.resume();
+            return doFetch(nextUrl, redirectsLeft - 1);
+          }
+
+          if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
+            res.resume();
+            return reject(new Error(`خطا در دریافت فایل از سرور مقصد (کد: ${res.statusCode})`));
+          }
+
+          const contentLength = res.headers['content-length'];
+          const totalSize = contentLength ? parseInt(contentLength, 10) || 0 : 0;
+          const contentType = (res.headers['content-type'] as string) || '';
+
+          if (totalSize > 0) {
+            task.totalSize = totalSize;
+          }
+
+          const writeStream = fs.createWriteStream(destPath, { highWaterMark: 1024 * 1024 });
+          let downloadedBytes = 0;
+          const downloadStart = Date.now();
+
+          res.on('data', (chunk: Buffer) => {
+            if (task.status === 'failed' || task.phase === 'failed') {
+              req.destroy();
+              res.destroy();
+              writeStream.destroy();
+              return;
+            }
+
+            downloadedBytes += chunk.length;
+            task.loadedSize = downloadedBytes;
+
+            if (task.totalSize > 0) {
+              task.progress = Math.min(Math.round((downloadedBytes / task.totalSize) * 50), 49);
+            } else {
+              task.progress = 25;
+            }
+
+            const elapsedSec = (Date.now() - downloadStart) / 1000 || 0.1;
+            const bytesPerSec = downloadedBytes / elapsedSec;
+            task.speedBytesPerSec = bytesPerSec;
+            task.speed = formatSpeedBytes(bytesPerSec);
+          });
+
+          res.pipe(writeStream);
+
+          writeStream.on('finish', () => {
+            writeStream.close(() => {
+              resolve({ downloadedBytes, contentType, totalSize });
+            });
+          });
+
+          writeStream.on('error', (err) => {
+            req.destroy();
+            res.destroy();
+            reject(err);
+          });
+
+          res.on('error', (err) => {
+            writeStream.destroy();
+            reject(err);
+          });
+        }
+      );
+
+      req.on('error', (err) => {
+        reject(err);
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('اتصال به سرور مقصد زمان‌بر شد (Timeout)'));
+      });
+    }
+
+    doFetch(targetUrl, maxRedirects);
+  });
+}
+
+  // Real MTProto & Remote Stream Execution
+  const tempFilePath = path.join('/tmp', `remote_tx_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.tmp`);
+
+  try {
+    const { downloadedBytes, contentType } = await downloadStreamToFile(url, tempFilePath, task);
+
+    if (task.status === 'failed' || task.phase === 'failed') return;
+
+    task.loadedSize = downloadedBytes;
+    task.totalSize = downloadedBytes;
+    task.phase = 'uploading';
+
+    // Phase 2: Upload File to Telegram Saved Messages ('me')
+    const fileMime = contentType || getAccurateMimeType(filename);
+    const customFile = new CustomFile(filename, downloadedBytes, tempFilePath);
+
+    const uploadStart = Date.now();
+
+    const uploadedMsg = await client.sendFile('me', {
+      file: customFile,
+      caption: caption || `فایل دریافت‌شده از لینک مستقیم:\n${url}`,
+      forceDocument: !fileMime.startsWith('image/'),
+      workers: 16,
+      progressCallback: (progressFraction: number) => {
+        if (task.status === 'failed' || task.phase === 'failed') {
+          throw new Error('CANCELLED');
+        }
+        const p = Math.max(0, Math.min(1, progressFraction));
+        task.progress = 50 + Math.round(p * 50);
+
+        const uploadedBytes = Math.round(p * downloadedBytes);
+        const elapsedSec = (Date.now() - uploadStart) / 1000 || 0.1;
+        const bytesPerSec = uploadedBytes / elapsedSec;
+        task.speedBytesPerSec = bytesPerSec;
+        task.speed = formatSpeedBytes(bytesPerSec);
+        task.loadedSize = uploadedBytes;
+      },
+    });
+
+    if (task.status === 'failed' || task.phase === 'failed') return;
+
+    task.progress = 100;
+    task.status = 'completed';
+    task.phase = 'completed';
+    task.messageId = (uploadedMsg as any)?.id || Date.now();
+  } catch (err: any) {
+    if (err?.message === 'CANCELLED' || task.status === 'failed') {
+      return;
+    }
+    task.status = 'failed';
+    task.phase = 'failed';
+    task.error = err?.message || 'خطا در دانلود و انتقال لینک مستقیم';
+  } finally {
+    if (tempFilePath) {
+      try { await fs.promises.unlink(tempFilePath); } catch {}
+    }
+  }
+}
+
+// 2. Poll Remote Transfer Task Progress & Speed
+app.get('/api/telegram/remote-upload-status/:taskId', (req: Request, res: Response) => {
+  const taskId = req.params.taskId;
+  const task = remoteTasksMap.get(taskId);
+
+  if (!task) {
+    return res.status(404).json({ success: false, error: 'تسک پیدا نشد' });
+  }
+
+  return res.json({
+    success: true,
+    task: {
+      id: task.id,
+      filename: task.filename,
+      totalSize: task.totalSize,
+      loadedSize: task.loadedSize,
+      progress: task.progress,
+      speed: task.speed,
+      phase: task.phase,
+      status: task.status,
+      messageId: task.messageId,
+      error: task.error,
+    },
+  });
+});
+
+// Legacy synchronous remote-upload endpoint
+app.post('/api/telegram/remote-upload', async (req: Request, res: Response) => {
+  try {
+    const { url, filename, caption } = req.body;
+    if (!url || typeof url !== 'string' || (!url.startsWith('http://') && !url.startsWith('https://'))) {
+      return res.status(400).json({ success: false, error: 'لینک مستقیم معتبر وارد نشده است.' });
+    }
+
+    const sessionId = getSessionId(req);
+    const client = getActiveClient(sessionId);
+
+    if (!client) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      return res.json({
+        success: true,
+        messageId: Date.now(),
+        filename: filename || 'remote_file.mp4',
+        message: 'فایل با موفقیت در محیط آزمایشی ثبت شد. جهت ذخیره در تلگرام واقعی، لاگین کنید.',
+      });
+    }
+
+    const fetchRes = await fetch(url, { redirect: 'follow' });
+    if (!fetchRes.ok) {
+      return res.status(400).json({
+        success: false,
+        error: `خطا در دریافت فایل از لینک (کد وضعیت: ${fetchRes.status})`,
+      });
+    }
+
+    const arrayBuffer = await fetchRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    let finalName = filename || 'downloaded_file';
+    if (finalName === 'downloaded_file') {
+      try {
+        const urlObj = new URL(url);
+        const base = path.basename(urlObj.pathname);
+        if (base && base.includes('.')) {
+          finalName = decodeURIComponent(base);
+        }
+      } catch (e) {}
+    }
+
+    const contentType = fetchRes.headers.get('content-type') || getAccurateMimeType(finalName);
+    const tempFilePath = path.join('/tmp', `remote_up_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.tmp`);
+    await fs.promises.writeFile(tempFilePath, buffer);
+
+    try {
+      const customFile = new CustomFile(finalName, buffer.length, tempFilePath);
+
+      const uploadedMessage = await client.sendFile('me', {
+        file: customFile,
+        caption: caption || `فایل دریافتی از لینک مستقیم:\n${url}`,
+        forceDocument: !contentType.startsWith('image/'),
+        workers: 16,
+      });
+
+    const msgId = (uploadedMessage as any)?.id || Date.now();
+
+    return res.json({
+        success: true,
+        messageId: msgId,
+        filename: finalName,
+        size: buffer.length,
+        mimeType: contentType,
+        message: 'فایل با موفقیت به سیو مسیج تلگرام ارسال شد!',
+      });
+    } finally {
+      if (tempFilePath) {
+        try { await fs.promises.unlink(tempFilePath); } catch {}
+      }
+    }
+  } catch (err: any) {
+    console.error('Remote upload error:', err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'خطا در دریافت فایل از لینک و ارسال به تلگرام',
+    });
+  }
+});
+
+
 
 // In-Memory Thumbnail Cache to prevent repeated MTProto requests for identical small images
 const thumbMemoryCache = new Map<string, { buffer: Buffer; mime: string; cachedAt: number }>();
@@ -1319,27 +2114,46 @@ app.get(['/api/telegram/stream/:messageId/:filename?', '/api/telegram/download/:
 
     if (rangeHeader && totalSize > 0) {
       const parts = rangeHeader.replace(/bytes=/, '').split('-');
-      const start = parseInt(parts[0], 10);
-      const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+      const start = Math.max(0, parseInt(parts[0], 10) || 0);
+      const end = parts[1] ? Math.min(totalSize - 1, parseInt(parts[1], 10)) : totalSize - 1;
       const chunkSize = end - start + 1;
 
       res.status(206);
       res.setHeader('Content-Range', `bytes ${start}-${end}/${totalSize}`);
       res.setHeader('Content-Length', chunkSize);
 
-      // Stream directly from Telegram MTProto into RAM chunks and pipe to HTTP response
-      // Telegram downloads in 128KB / 512KB chunks
-      let bytesSent = 0;
+      // Telegram MTProto requires offsets and request sizes to be aligned to 4KB (4096 bytes)
+      const STREAM_CHUNK_SIZE = 128 * 1024; // 128KB
+      const alignedStart = Math.floor(start / STREAM_CHUNK_SIZE) * STREAM_CHUNK_SIZE;
+      let skipOffset = start - alignedStart;
+      let bytesRemaining = chunkSize;
+
       for await (const chunk of client.iterDownload({
         file: media,
-        offset: bigInt(start),
-        limit: chunkSize,
-        requestSize: 128 * 1024,
+        offset: bigInt(alignedStart),
+        requestSize: STREAM_CHUNK_SIZE,
       })) {
         if (res.destroyed || res.writableEnded) break;
-        res.write(chunk);
-        bytesSent += chunk.length;
-        if (bytesSent >= chunkSize) break;
+
+        let chunkData = chunk;
+
+        if (skipOffset > 0) {
+          if (skipOffset >= chunkData.length) {
+            skipOffset -= chunkData.length;
+            continue;
+          }
+          chunkData = chunkData.subarray(skipOffset);
+          skipOffset = 0;
+        }
+
+        if (chunkData.length > bytesRemaining) {
+          chunkData = chunkData.subarray(0, bytesRemaining);
+        }
+
+        res.write(chunkData);
+        bytesRemaining -= chunkData.length;
+
+        if (bytesRemaining <= 0) break;
       }
       return res.end();
     }
@@ -1349,10 +2163,11 @@ app.get(['/api/telegram/stream/:messageId/:filename?', '/api/telegram/download/:
     }
 
     // Full Stream directly from Telegram without disk buffering
+    const FULL_STREAM_CHUNK_SIZE = 256 * 1024;
     for await (const chunk of client.iterDownload({
       file: media,
       offset: bigInt(0),
-      requestSize: 256 * 1024,
+      requestSize: FULL_STREAM_CHUNK_SIZE,
     })) {
       if (res.destroyed || res.writableEnded) break;
       res.write(chunk);
@@ -1589,27 +2404,35 @@ app.post('/api/telegram/upload', upload.single('file'), async (req: Request, res
     const caption = (req.body.caption as string) || '';
     const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8'); // Handle UTF-8 / Persian filenames correctly
 
-    // Create a CustomFile in RAM without writing to disk
-    const customFile = new CustomFile(originalName, file.size, '', file.buffer);
+    const tempFilePath = path.join('/tmp', `up_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.tmp`);
+    await fs.promises.writeFile(tempFilePath, file.buffer);
 
-    // Upload strictly to Saved Messages ('me')
-    const uploadedMessage = await client.sendFile('me', {
-      file: customFile,
-      caption: caption || originalName,
-      forceDocument: !file.mimetype.startsWith('image/'),
-      workers: 2,
-    });
+    try {
+      const customFile = new CustomFile(originalName, file.size, tempFilePath);
+
+      // Upload strictly to Saved Messages ('me')
+      const uploadedMessage = await client.sendFile('me', {
+        file: customFile,
+        caption: caption || originalName,
+        forceDocument: !file.mimetype.startsWith('image/'),
+        workers: 2,
+      });
 
     const msgId = (uploadedMessage as any)?.id || Date.now();
 
     return res.json({
-      success: true,
-      messageId: msgId,
-      filename: originalName,
-      size: file.size,
-      mimeType: file.mimetype,
-      message: 'File successfully uploaded to Saved Messages!',
-    });
+        success: true,
+        messageId: msgId,
+        filename: originalName,
+        size: file.size,
+        mimeType: file.mimetype,
+        message: 'File successfully uploaded to Saved Messages!',
+      });
+    } finally {
+      if (tempFilePath) {
+        try { await fs.promises.unlink(tempFilePath); } catch {}
+      }
+    }
   } catch (err: any) {
     console.error('Upload error:', err);
     return res.status(500).json({ error: err.message || 'Failed to upload file to Telegram' });

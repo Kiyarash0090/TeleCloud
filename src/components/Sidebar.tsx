@@ -22,6 +22,9 @@ import {
   UserPlus,
   Loader2,
   Users,
+  Link2,
+  Info,
+  Star,
 } from 'lucide-react';
 import { FileCategory } from '../types';
 import { useTelegram } from '../context/TelegramContext';
@@ -38,6 +41,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
     stats,
     setIsUploadModalOpen,
     setIsLoginModalOpen,
+    setIsTelegramLinkModalOpen,
     user,
     accounts,
     activeAccountId,
@@ -49,7 +53,10 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
     activePeer,
     activeChatTitle,
     setIsChatSelectorOpen,
+    favoriteFileIds,
   } = useTelegram();
+
+
   const { t, lang, setLang, isDark, toggleTheme } = useTheme();
 
   const [isAccountListOpen, setIsAccountListOpen] = useState(false);
@@ -79,7 +86,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
   };
 
   const handleSwitchAccount = async (accountId: string) => {
-    if (isSwitchingAccount) return;
+    if (isSwitchingAccount) return false;
     setSwitchingTargetId(accountId);
     const ok = await switchAccount(accountId);
     setSwitchingTargetId(null);
@@ -88,6 +95,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
       setActiveTab('files');
       onClose?.();
     }
+    return ok;
   };
 
   const handleRemoveAccount = async (e: React.MouseEvent, accountId: string) => {
@@ -248,6 +256,19 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
               </div>
 
               <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveTab('account');
+                    onClose?.();
+                  }}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-sky-400 hover:bg-slate-200/70 dark:hover:bg-zinc-800 transition active:scale-90 cursor-pointer"
+                  title={lang === 'fa' ? 'اطلاعات اکانت' : 'Account Info'}
+                >
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+
                 {isSwitchingAccount ? (
                   <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
                 ) : (
@@ -320,6 +341,28 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
 
                         <button
                           type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isCurrent) {
+                              setActiveTab('account');
+                              onClose?.();
+                            } else {
+                              handleSwitchAccount(acc.id).then((ok) => {
+                                if (ok) {
+                                  setActiveTab('account');
+                                  onClose?.();
+                                }
+                              });
+                            }
+                          }}
+                          className="p-1 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-sky-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition active:scale-90 cursor-pointer"
+                          title={lang === 'fa' ? 'اطلاعات اکانت' : 'Account Info'}
+                        >
+                          <Info className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
                           onClick={(e) => handleRemoveAccount(e, acc.id)}
                           className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
                           title={t('removeAccount')}
@@ -369,18 +412,62 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
               setIsUploadModalOpen(true);
               onClose?.();
             }}
-            className="w-full mb-5 py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] cursor-pointer"
+            className="w-full mb-2.5 py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] cursor-pointer"
           >
             <UploadCloud className="w-5 h-5 stroke-[2.2]" />
             <span>{t('upload')}</span>
           </button>
         ) : (
-          <div className="w-full mb-5 py-2.5 px-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 text-amber-700 dark:text-amber-300 text-[11px] font-bold flex items-center justify-center gap-2">
+          <div className="w-full mb-2.5 py-2.5 px-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 text-amber-700 dark:text-amber-300 text-[11px] font-bold flex items-center justify-center gap-2">
             <span>
               {lang === 'fa' ? 'حالت فقط خواندنی (بدون آپلود)' : 'Read-Only Mode (No Upload)'}
             </span>
           </div>
         )}
+
+        {/* Telegram Link Inspector Quick Trigger */}
+        <button
+          onClick={() => {
+            setIsTelegramLinkModalOpen(true);
+            onClose?.();
+          }}
+          className="w-full mb-2 py-2.5 px-3.5 rounded-2xl bg-blue-50/80 dark:bg-sky-950/30 hover:bg-blue-100 dark:hover:bg-sky-900/40 text-blue-600 dark:text-sky-400 font-bold text-xs border border-blue-200/70 dark:border-sky-800/50 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
+        >
+          <Link2 className="w-4 h-4" />
+          <span>{t('telegramLinkInspector')}</span>
+        </button>
+
+
+
+
+        {/* Favorites Navigation Item */}
+        <button
+          onClick={() => {
+            setActiveTab('favorites');
+            setSelectedCategory('all');
+            setSelectedExtension(null);
+            onClose?.();
+          }}
+          className={`w-full mb-3 flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer active:scale-[0.99] ${
+            activeTab === 'favorites'
+              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold shadow-2xs'
+              : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/60 hover:text-amber-600 dark:hover:text-amber-400'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <Star
+              className={`w-4 h-4 shrink-0 text-amber-500 ${
+                activeTab === 'favorites' ? 'fill-amber-500' : ''
+              }`}
+            />
+            <span className="truncate">{t('favorites')}</span>
+          </div>
+          {favoriteFileIds.length > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400">
+              {favoriteFileIds.length}
+            </span>
+          )}
+        </button>
 
         {/* Section Label */}
         <div className="px-2 mb-2 text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">
@@ -480,45 +567,6 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
               {lang === 'fa' ? 'نامحدود' : 'Unlimited'}
             </span>
           </div>
-        </div>
-
-        {/* Telegram User Profile Details Link Card */}
-        <div
-          onClick={handleSelectAccount}
-          className="flex items-center justify-between p-2 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 hover:border-blue-400/50 transition-all cursor-pointer group"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-600 dark:text-sky-400 overflow-hidden flex items-center justify-center font-bold text-xs shrink-0">
-              {userPhoto && !failedPhotos[user?.id || 'active'] ? (
-                <img
-                  src={userPhoto}
-                  alt={userName}
-                  onError={() =>
-                    setFailedPhotos((prev) => ({ ...prev, [user?.id || 'active']: true }))
-                  }
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                userName[0]?.toUpperCase() || 'U'
-              )}
-            </div>
-            <div className="min-w-0">
-              <span className="text-xs font-bold text-slate-800 dark:text-zinc-200 block truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-sky-400 transition-colors">
-                {userName}
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono truncate block">
-                {user?.username
-                  ? `@${user.username}`
-                  : isConnected
-                  ? 'Telegram User'
-                  : isDemoMode
-                  ? 'Demo Mode'
-                  : 'Guest'}
-              </span>
-            </div>
-          </div>
-
-          <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 ltr:group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5 rtl:rotate-180 transition-all shrink-0" />
         </div>
       </div>
     </aside>

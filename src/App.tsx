@@ -1,11 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { TelegramProvider, useTelegram, useBackHandler } from './context/TelegramContext';
 import { QueueProvider, useQueue } from './context/QueueContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { MobileBottomNav } from './components/MobileBottomNav';
-import { StorageStatsBar } from './components/StorageStatsBar';
 import { QuickFilters } from './components/QuickFilters';
 import { FileGrid } from './components/FileGrid';
 import { FileList } from './components/FileList';
@@ -21,15 +20,15 @@ import { MultiSelectBar } from './components/MultiSelectBar';
 import { WebAppAuthModal } from './components/WebAppAuthModal';
 import { AccountPage } from './components/AccountPage';
 import { ChatSelectorModal } from './components/ChatSelectorModal';
-import { Cloud, Sparkles, RotateCw, UploadCloud, LogOut } from 'lucide-react';
+import { TelegramLinkModal } from './components/TelegramLinkModal';
+import { AccountSwitcherDrawer } from './components/AccountSwitcherDrawer';
+import { RotateCw, UploadCloud, LogOut } from 'lucide-react';
 
 function TeleCloudApp() {
   const {
     activeTab,
     isWebAuthProtected,
     isWebAuthenticated,
-    isConnected,
-    isDemoMode,
     isLoading,
     filteredFiles,
     viewMode,
@@ -49,9 +48,16 @@ function TeleCloudApp() {
     setIsUploadModalOpen,
     isChatSelectorOpen,
     setIsChatSelectorOpen,
+    isTelegramLinkModalOpen,
+    setIsTelegramLinkModalOpen,
+    isAccountDrawerOpen,
+    setIsAccountDrawerOpen,
     activePeer,
-    connectDemoMode,
     showExitToast,
+    files,
+    hasMoreFiles,
+    isLoadingMore,
+    loadMoreFiles,
   } = useTelegram();
 
   const { addFilesToQueue } = useQueue();
@@ -59,6 +65,24 @@ function TeleCloudApp() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isWorkspaceDragging, setIsWorkspaceDragging] = useState(false);
   const dragCounterRef = useRef(0);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel || !hasMoreFiles || isLoading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !isLoadingMore) {
+          loadMoreFiles();
+        }
+      },
+      { rootMargin: '320px' }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreFiles, isLoading, isLoadingMore, loadMoreFiles]);
 
   const isSavedMessages = !activePeer || activePeer === 'me';
 
@@ -71,6 +95,10 @@ function TeleCloudApp() {
   useBackHandler(isLoginModalOpen, () => setIsLoginModalOpen(false));
   useBackHandler(Boolean(isUploadModalOpen && isSavedMessages), () => setIsUploadModalOpen(false));
   useBackHandler(isChatSelectorOpen, () => setIsChatSelectorOpen(false));
+  useBackHandler(isTelegramLinkModalOpen, () => setIsTelegramLinkModalOpen(false));
+  useBackHandler(isAccountDrawerOpen, () => setIsAccountDrawerOpen(false));
+
+
 
   if (isWebAuthProtected && !isWebAuthenticated) {
     return <WebAppAuthModal />;
@@ -166,45 +194,13 @@ function TeleCloudApp() {
             <AccountPage />
           ) : (
             <>
-              {/* Welcome Banner if not connected to Telegram or Demo */}
-              {!isConnected && !isDemoMode && (
-                <div className="mb-4 sm:mb-6 p-4 sm:p-7 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-blue-600 via-sky-600 to-indigo-600 text-white shadow-xl shadow-blue-500/15 relative overflow-hidden">
-                  <div className="relative z-10 max-w-2xl">
-                    <h2 className="text-lg sm:text-2xl font-extrabold tracking-tight mb-1.5">
-                      {lang === 'fa' ? 'به تله‌کلاد خوش آمدید' : 'Welcome to TeleCloud'}
-                    </h2>
-                    <p className="text-xs sm:text-sm text-blue-100 leading-relaxed mb-4 sm:mb-6">
-                      {t('loginSubtitle')}
-                    </p>
 
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                      <button
-                        onClick={() => setIsLoginModalOpen(true)}
-                        className="flex-1 sm:flex-initial justify-center px-4 sm:px-5 py-2.5 rounded-xl sm:rounded-full bg-white text-blue-700 hover:bg-blue-50 font-bold text-xs shadow-lg transition active:scale-95 flex items-center gap-2 cursor-pointer"
-                      >
-                        <Cloud className="w-4 h-4 shrink-0" />
-                        <span>{t('connectTelegram')}</span>
-                      </button>
-
-                      <button
-                        onClick={connectDemoMode}
-                        className="flex-1 sm:flex-initial justify-center px-4 sm:px-5 py-2.5 rounded-xl sm:rounded-full bg-white/15 hover:bg-white/25 text-white font-bold text-xs backdrop-blur-md transition active:scale-95 flex items-center gap-2 cursor-pointer"
-                      >
-                        <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
-                        <span>{t('demoModeBtn')}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <Cloud className=" -bottom-8 -right-8 w-44 h-44 sm:w-64 sm:h-64 text-white/10 pointer-events-none" />
-                </div>
-              )}
 
               {/* Category & Format Filters */}
               <QuickFilters />
 
               {/* Loading Spinner */}
-              {isLoading ? (
+              {isLoading && activeTab === 'files' ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
                   <RotateCw className="w-8 h-8 text-blue-500 animate-spin mb-3" />
                   <p className="text-xs font-semibold text-slate-500 dark:text-zinc-400">
@@ -213,10 +209,50 @@ function TeleCloudApp() {
                       : 'Streaming files from Telegram...'}
                   </p>
                 </div>
-              ) : viewMode === 'grid' ? (
-                <FileGrid files={filteredFiles} />
               ) : (
-                <FileList files={filteredFiles} />
+                <>
+                  {viewMode === 'grid' ? (
+                    <FileGrid files={filteredFiles} />
+                  ) : (
+                    <FileList files={filteredFiles} />
+                  )}
+
+                  {/* Infinite Scroll Sentinel & Channel Pagination Bar */}
+                  {hasMoreFiles && activeTab === 'files' && (
+                    <div
+                      ref={loadMoreSentinelRef}
+                      className="mt-6 mb-2 flex flex-col sm:flex-row items-center justify-between gap-3 py-3 px-4 rounded-2xl bg-white/70 dark:bg-[#18191d]/70 border border-slate-200/80 dark:border-zinc-800/80 backdrop-blur-md shadow-2xs"
+                    >
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-zinc-300">
+                        {isLoadingMore ? (
+                          <RotateCw className="w-4 h-4 text-blue-500 animate-spin shrink-0" />
+                        ) : (
+                          <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                        )}
+                        <span>
+                          {isLoadingMore
+                            ? lang === 'fa'
+                              ? `در حال دریافت فایل‌های بیشتر... (${files.length} فایل تا اینجا)`
+                              : `Loading more files... (${files.length} loaded so far)`
+                            : lang === 'fa'
+                            ? `${files.length} فایل نمایش داده شده (فایل‌های قدیمی‌تر در کانال موجود است)`
+                            : `${files.length} files displayed (more available in channel)`}
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => loadMoreFiles()}
+                        disabled={isLoadingMore}
+                        className="w-full sm:w-auto px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition active:scale-95 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
+                      >
+                        {isLoadingMore ? (
+                          <RotateCw className="w-3.5 h-3.5 animate-spin shrink-0" />
+                        ) : null}
+                        <span>{lang === 'fa' ? 'بارگذاری دسته بعدی' : 'Load Next Batch'}</span>
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
@@ -263,6 +299,15 @@ function TeleCloudApp() {
       {isChatSelectorOpen && (
         <ChatSelectorModal onClose={() => setIsChatSelectorOpen(false)} />
       )}
+
+      {isTelegramLinkModalOpen && (
+        <TelegramLinkModal onClose={() => setIsTelegramLinkModalOpen(false)} />
+      )}
+
+      <AccountSwitcherDrawer />
+
+
+
 
       {/* Double-Back-to-Exit Floating Toast */}
       {showExitToast && (

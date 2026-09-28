@@ -34,15 +34,74 @@
   }
 }
 
-/* Hide scrollbars on horizontal touch carousels while preserving momentum scroll */
+/* Global Sleek Custom Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+.dark * {
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+/* WebKit Custom Scrollbar (Chrome, Edge, Safari, Opera) */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.65);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: rgba(37, 99, 235, 0.85);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.55);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.dark ::-webkit-scrollbar-thumb:active {
+  background: rgba(56, 189, 248, 0.8);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Hide scrollbars on specific horizontal carousels while preserving momentum scroll */
 .no-scrollbar::-webkit-scrollbar,
 .scrollbar-none::-webkit-scrollbar {
-  display: none;
+  display: none !important;
 }
 .no-scrollbar,
 .scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
 }
 
 /* Ultra-Fast Smooth Theme Transitions */
@@ -94,4 +153,53 @@ html {
   perspective: 1000px;
   touch-action: none;
 }
+
+/* Telegram-Style Account Popover Scale Spring Animation */
+@keyframes account-popover-spring-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.35) translate3d(0, 18px, 0);
+    filter: blur(4px);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.03) translate3d(0, -2px, 0);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translate3d(0, 0, 0);
+    filter: blur(0px);
+  }
+}
+
+@keyframes account-popover-spring-out {
+  0% {
+    opacity: 1;
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.45) translate3d(0, 14px, 0);
+  }
+}
+
+.account-popover-enter {
+  animation: account-popover-spring-in 0.34s cubic-bezier(0.22, 1.28, 0.36, 1) forwards;
+  will-change: transform, opacity, filter;
+}
+
+.account-popover-exit {
+  animation: account-popover-spring-out 0.16s cubic-bezier(0.4, 0, 1, 1) forwards;
+  will-change: transform, opacity;
+}
+
+html[dir="rtl"] .account-popover-origin {
+  transform-origin: 28px calc(100% + 20px);
+}
+
+html[dir="ltr"] .account-popover-origin {
+  transform-origin: calc(100% - 28px) calc(100% + 20px);
+}
+
 

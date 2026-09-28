@@ -56,6 +56,58 @@ function loadSharedApiCreds(): SharedApiCredentials | null {
   }
 }
 
+function extractPeerFromUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  try {
+    const match = url.match(/[?&]peer=([^&]+)/);
+    if (match && match[1]) {
+      return decodeURIComponent(match[1]);
+    }
+  } catch {}
+  return undefined;
+}
+
+function ensurePeerInUrl(url: string | null | undefined, peer: string): string | undefined {
+  if (!url) return undefined;
+  if (!url.startsWith('/')) return url;
+  if (/[?&]peer=/.test(url)) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}peer=${encodeURIComponent(peer)}`;
+}
+
+export function resolveFilePeer(file: TelegramFile, fallbackPeer?: string): string {
+  return (
+    file.originPeer ||
+    extractPeerFromUrl(file.directUrl) ||
+    extractPeerFromUrl(file.downloadUrl) ||
+    extractPeerFromUrl(file.streamUrl) ||
+    extractPeerFromUrl(file.thumbnailUrl) ||
+    fallbackPeer ||
+    'me'
+  );
+}
+
+function normalizeFavoriteFile(
+  file: TelegramFile,
+  fallbackPeer?: string,
+  fallbackTitle?: string
+): TelegramFile {
+  const peer = resolveFilePeer(file, fallbackPeer);
+  const title =
+    file.originChatTitle ||
+    fallbackTitle ||
+    (peer === 'me' ? 'Saved Messages' : peer);
+  return {
+    ...file,
+    originPeer: peer,
+    originChatTitle: title,
+    thumbnailUrl: ensurePeerInUrl(file.thumbnailUrl, peer) ?? file.thumbnailUrl,
+    downloadUrl: ensurePeerInUrl(file.downloadUrl, peer) || file.downloadUrl,
+    streamUrl: ensurePeerInUrl(file.streamUrl, peer) || file.streamUrl,
+    directUrl: ensurePeerInUrl(file.directUrl, peer) || file.directUrl,
+  };
+}
+
 interface TelegramContextType {
   // Navigation tabs
   activeTab: ActiveTab;
@@ -106,8 +158,17 @@ interface TelegramContextType {
   setSortOption: (s: SortOption) => void;
   viewMode: ViewMode;
   setViewMode: (v: ViewMode) => void;
-  refreshFiles: () => Promise<void>;
+  refreshFiles: (forceReload?: boolean) => Promise<void>;
+  loadMoreFiles: () => Promise<void>;
+  hasMoreFiles: boolean;
+  isLoadingMore: boolean;
   deleteFile: (id: number) => Promise<boolean>;
+
+  // Favorites (Global across all chats & channels)
+  favoriteFiles: TelegramFile[];
+  favoriteFileIds: number[];
+  toggleFavorite: (fileOrId: TelegramFile | number, peer?: string) => void;
+  isFavorite: (fileOrId: TelegramFile | number, peer?: string) => boolean;
 
   // Players & Modals
   activeVideo: TelegramFile | null;
@@ -124,6 +185,11 @@ interface TelegramContextType {
   setIsLoginModalOpen: (open: boolean) => void;
   isUploadModalOpen: boolean;
   setIsUploadModalOpen: (open: boolean) => void;
+  isTelegramLinkModalOpen: boolean;
+  setIsTelegramLinkModalOpen: (open: boolean) => void;
+  isAccountDrawerOpen: boolean;
+  setIsAccountDrawerOpen: (open: boolean) => void;
+
 
   // Audio & Video player global control
   isPlayingAudio: boolean;
@@ -178,9 +244,68 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
     loadSharedApiCreds()
   );
 
-  // File data
+  // Chat / Channel / Bot Selector state
+  const [activePeer, setActivePeerState] = useState<string>('me');
+  const [activeChatTitle, setActiveChatTitle] = useState<string>('Saved Messages');
+  const [isChatSelectorOpen, setIsChatSelectorOpen] = useState(false);
+
+  // File data, in-memory channel cache & pagination
   const [files, setFiles] = useState<TelegramFile[]>([]);
-  const [stats, setStats] = useState<StorageStats | null>(null);
+  const [hasMoreFiles, setHasMoreFiles] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const nextOffsetIdRef = useRef<number>(0);
+  const activeFetchTokenRef = useRef<number>(0);
+  const isLoadingMoreRef = useRef<boolean>(false);
+
+  // In-memory cache for channel/chat file lists: key is `${activeAccountId}_${activePeer}`
+  const channelCacheRef = useRef<
+    Map<
+      string,
+      {
+        files: TelegramFile[];
+        nextOffsetId: number;
+        hasMore: boolean;
+        timestamp: number;
+      }
+    >
+  >(new Map());
+
+  const getCacheKey = useCallback(
+    (peer?: string) => {
+      const acc = activeAccountId || user?.id || 'default';
+      const p = peer !== undefined ? peer : activePeer || 'me';
+      return `${acc}_${p}`;
+    },
+    [activeAccountId, user?.id, activePeer]
+  );
+
+  // Live computed storage stats across all loaded files
+  const stats = React.useMemo<StorageStats | null>(() => {
+    if (isDemoMode) return DEMO_STATS;
+    if (!isConnected && files.length === 0) return null;
+    const result: StorageStats = {
+      totalFiles: 0,
+      totalSize: 0,
+      categories: {
+        images: { count: 0, size: 0 },
+        videos: { count: 0, size: 0 },
+        audio: { count: 0, size: 0 },
+        documents: { count: 0, size: 0 },
+        archives: { count: 0, size: 0 },
+        other: { count: 0, size: 0 },
+      },
+    };
+    for (const f of files) {
+      const cat = (f.category in result.categories ? f.category : 'other') as Exclude<FileCategory, 'all'>;
+      if (result.categories[cat]) {
+        result.categories[cat].count += 1;
+        result.categories[cat].size += f.size || 0;
+      }
+      result.totalFiles += 1;
+      result.totalSize += f.size || 0;
+    }
+    return result;
+  }, [files, isDemoMode, isConnected]);
 
   // UI Filters & Sorting
   const [selectedCategory, setSelectedCategory] = useState<FileCategory>('all');
@@ -198,9 +323,170 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
   const [shareModalFile, setShareModalFile] = useState<TelegramFile | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isTelegramLinkModalOpen, setIsTelegramLinkModalOpen] = useState(false);
+  const [isAccountDrawerOpen, setIsAccountDrawerOpen] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+
   const [selectedFileIds, setSelectedFileIds] = useState<number[]>([]);
   const [showExitToast, setShowExitToast] = useState(false);
+
+  // Global Favorites state persisted in localStorage across all chats & channels
+  const [favoriteFiles, setFavoriteFiles] = useState<TelegramFile[]>(() => {
+    try {
+      const raw = localStorage.getItem('telecloud_favorite_items');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const seen = new Set<string>();
+          const normalized: TelegramFile[] = [];
+          for (const item of parsed) {
+            if (!item || typeof item.id !== 'number') continue;
+            const norm = normalizeFavoriteFile(item);
+            const key = `${norm.originPeer || 'me'}_${norm.id}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              normalized.push(norm);
+            }
+          }
+          return normalized;
+        }
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Automatically hydrate/backfill any legacy ID-only favorites or missing chat titles when files load
+  useEffect(() => {
+    if (files.length === 0) return;
+    try {
+      const legacyRaw = localStorage.getItem('telecloud_favorites');
+      const legacyIds: number[] = legacyRaw ? JSON.parse(legacyRaw) : [];
+      const legacySet = new Set(Array.isArray(legacyIds) ? legacyIds : []);
+
+      setFavoriteFiles((prev) => {
+        let changed = false;
+        const next = prev.map((fav) => {
+          const favPeer = resolveFilePeer(fav);
+          const currentPeer = activePeer || 'me';
+          if (
+            favPeer === currentPeer &&
+            activeChatTitle &&
+            (!fav.originChatTitle || fav.originChatTitle === favPeer)
+          ) {
+            changed = true;
+            return normalizeFavoriteFile(fav, currentPeer, activeChatTitle);
+          }
+          return fav;
+        });
+
+        for (const f of files) {
+          const fPeer = resolveFilePeer(f, activePeer || 'me');
+          const alreadyInNext = next.some(
+            (fav) => fav.id === f.id && resolveFilePeer(fav) === fPeer
+          );
+          if (!alreadyInNext && legacySet.has(f.id) && prev.length === 0) {
+            changed = true;
+            next.push(
+              normalizeFavoriteFile(
+                { ...f, starredAt: Date.now() },
+                fPeer,
+                activeChatTitle || 'Saved Messages'
+              )
+            );
+          }
+        }
+
+        if (changed) {
+          try {
+            localStorage.setItem('telecloud_favorite_items', JSON.stringify(next));
+          } catch {}
+          return next;
+        }
+        return prev;
+      });
+    } catch {}
+  }, [files, activePeer, activeChatTitle]);
+
+  const favoriteFileIds = React.useMemo(() => {
+    return favoriteFiles.map((f) => f.id);
+  }, [favoriteFiles]);
+
+  const toggleFavorite = useCallback(
+    (fileOrId: TelegramFile | number, peer?: string) => {
+      setFavoriteFiles((prev) => {
+        const targetId = typeof fileOrId === 'number' ? fileOrId : fileOrId.id;
+        const fallbackPeer = peer || activePeer || 'me';
+        const foundInFiles =
+          typeof fileOrId === 'number'
+            ? files.find(
+                (f) =>
+                  f.id === targetId &&
+                  (!peer || resolveFilePeer(f, activePeer || 'me') === peer)
+              ) || files.find((f) => f.id === targetId)
+            : fileOrId;
+
+        const targetPeer = foundInFiles
+          ? resolveFilePeer(foundInFiles, fallbackPeer)
+          : fallbackPeer;
+
+        const existsInPeer = prev.some(
+          (f) => f.id === targetId && resolveFilePeer(f) === targetPeer
+        );
+        const existsAnywhere =
+          !existsInPeer &&
+          typeof fileOrId === 'number' &&
+          !peer &&
+          activeTab === 'favorites' &&
+          prev.some((f) => f.id === targetId);
+
+        let next: TelegramFile[];
+        if (existsInPeer) {
+          next = prev.filter(
+            (f) => !(f.id === targetId && resolveFilePeer(f) === targetPeer)
+          );
+        } else if (existsAnywhere) {
+          next = prev.filter((f) => f.id !== targetId);
+        } else if (foundInFiles) {
+          const fileToAdd = normalizeFavoriteFile(
+            {
+              ...foundInFiles,
+              starredAt: Date.now(),
+            },
+            targetPeer,
+            foundInFiles.originChatTitle || activeChatTitle || 'Saved Messages'
+          );
+          next = [fileToAdd, ...prev];
+        } else {
+          next = prev;
+        }
+
+        try {
+          localStorage.setItem('telecloud_favorite_items', JSON.stringify(next));
+          localStorage.setItem('telecloud_favorites', JSON.stringify(next.map((f) => f.id)));
+        } catch {}
+
+        return next;
+      });
+    },
+    [activePeer, activeChatTitle, activeTab, files]
+  );
+
+  const isFavorite = useCallback(
+    (fileOrId: TelegramFile | number, peer?: string) => {
+      const targetId = typeof fileOrId === 'number' ? fileOrId : fileOrId.id;
+      const targetPeer =
+        typeof fileOrId === 'number'
+          ? peer || activePeer || 'me'
+          : resolveFilePeer(fileOrId, peer || activePeer || 'me');
+
+      return favoriteFiles.some(
+        (f) => f.id === targetId && resolveFilePeer(f) === targetPeer
+      );
+    },
+    [favoriteFiles, activePeer]
+  );
 
   // Track if music was playing before a video opened, to auto-resume on close
   const wasPlayingAudioBeforeVideoRef = useRef(false);
@@ -319,11 +605,6 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   };
 
-  // Chat / Channel / Bot Selector state
-  const [activePeer, setActivePeerState] = useState<string>('me');
-  const [activeChatTitle, setActiveChatTitle] = useState<string>('Saved Messages');
-  const [isChatSelectorOpen, setIsChatSelectorOpen] = useState(false);
-
   const setActivePeer = useCallback((id: string, title: string) => {
     setActivePeerState(id);
     setActiveChatTitle(title);
@@ -333,48 +614,157 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Fetch files from real Telegram or Demo
-  const refreshFiles = useCallback(async () => {
-    if (isDemoMode) {
-      setFiles(DEMO_FILES);
-      setStats(DEMO_STATS);
-      setIsLoading(false);
-      return;
-    }
+  // Fetch initial batch of files from real Telegram or In-Memory Channel Cache
+  const refreshFiles = useCallback(
+    async (forceReload: boolean = false) => {
+      const fetchToken = ++activeFetchTokenRef.current;
+      isLoadingMoreRef.current = false;
+      setIsLoadingMore(false);
 
-    if (!isConnected) {
-      setFiles([]);
-      setStats(null);
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const [filesRes, statsRes] = await Promise.all([
-        fetch(`/api/telegram/files?limit=150&peer=${encodeURIComponent(activePeer)}`),
-        fetch(`/api/telegram/stats?peer=${encodeURIComponent(activePeer)}`),
-      ]);
-
-      if (filesRes.ok) {
-        const filesData = await filesRes.json();
-        if (filesData.success) {
-          setFiles(filesData.files || []);
-        }
+      if (isDemoMode) {
+        setFiles(DEMO_FILES);
+        setHasMoreFiles(false);
+        setIsLoading(false);
+        return;
       }
 
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        if (statsData.success) {
-          setStats(statsData.stats);
+      if (!isConnected) {
+        setFiles([]);
+        setHasMoreFiles(false);
+        setIsLoading(false);
+        return;
+      }
+
+      const cacheKey = getCacheKey();
+
+      // Check In-Memory Channel Cache for instant 0ms restoration without refetching
+      if (!forceReload && channelCacheRef.current.has(cacheKey)) {
+        const cached = channelCacheRef.current.get(cacheKey)!;
+        setFiles(cached.files);
+        nextOffsetIdRef.current = cached.nextOffsetId;
+        setHasMoreFiles(cached.hasMore);
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      nextOffsetIdRef.current = 0;
+
+      try {
+        const filesRes = await fetch(
+          `/api/telegram/files?limit=150&offsetId=0&peer=${encodeURIComponent(activePeer)}`
+        );
+
+        if (fetchToken !== activeFetchTokenRef.current) return;
+
+        if (filesRes.ok) {
+          const filesData = await filesRes.json();
+          if (filesData.success) {
+            const rawIncoming: TelegramFile[] = filesData.files || [];
+            const incoming: TelegramFile[] = rawIncoming.map((f) =>
+              normalizeFavoriteFile(
+                f,
+                activePeer || 'me',
+                activeChatTitle || 'Saved Messages'
+              )
+            );
+            const nextOffset = Number(filesData.nextOffsetId) || 0;
+            const more = Boolean(filesData.hasMore && nextOffset > 0);
+
+            setFiles(incoming);
+            nextOffsetIdRef.current = nextOffset;
+            setHasMoreFiles(more);
+
+            // Store in in-memory channel cache
+            channelCacheRef.current.set(cacheKey, {
+              files: incoming,
+              nextOffsetId: nextOffset,
+              hasMore: more,
+              timestamp: Date.now(),
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load files:', e);
+      } finally {
+        if (fetchToken === activeFetchTokenRef.current) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [isConnected, isDemoMode, activePeer, activeChatTitle, getCacheKey]
+  );
+
+  // Fetch the next page of older files on-demand (when scrolled near the bottom)
+  const loadMoreFiles = useCallback(async () => {
+    if (
+      isDemoMode ||
+      !isConnected ||
+      isLoading ||
+      isLoadingMoreRef.current ||
+      !hasMoreFiles ||
+      nextOffsetIdRef.current <= 0
+    ) {
+      return;
+    }
+
+    const fetchToken = activeFetchTokenRef.current;
+    const offsetToFetch = nextOffsetIdRef.current;
+    isLoadingMoreRef.current = true;
+    setIsLoadingMore(true);
+
+    try {
+      const res = await fetch(
+        `/api/telegram/files?limit=150&offsetId=${offsetToFetch}&peer=${encodeURIComponent(activePeer)}`
+      );
+
+      if (fetchToken !== activeFetchTokenRef.current) return;
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          const rawIncoming: TelegramFile[] = data.files || [];
+          const incoming: TelegramFile[] = rawIncoming.map((f) =>
+            normalizeFavoriteFile(
+              f,
+              activePeer || 'me',
+              activeChatTitle || 'Saved Messages'
+            )
+          );
+          const nextOffset = Number(data.nextOffsetId) || 0;
+          const more = Boolean(data.hasMore && nextOffset > 0 && nextOffset !== offsetToFetch);
+          nextOffsetIdRef.current = nextOffset;
+          setHasMoreFiles(more);
+
+          setFiles((prev) => {
+            const existingIds = new Set(prev.map((f) => f.id));
+            const uniqueNew = incoming.filter((f) => !existingIds.has(f.id));
+            const updated = uniqueNew.length > 0 ? [...prev, ...uniqueNew] : prev;
+
+            // Update in-memory channel cache with the expanded list
+            const cacheKey = getCacheKey();
+            channelCacheRef.current.set(cacheKey, {
+              files: updated,
+              nextOffsetId: nextOffset,
+              hasMore: more,
+              timestamp: Date.now(),
+            });
+
+            return updated;
+          });
+        } else {
+          setHasMoreFiles(false);
         }
       }
     } catch (e) {
-      console.error('Failed to load files:', e);
+      console.error('Failed to load more channel files:', e);
     } finally {
-      setIsLoading(false);
+      if (fetchToken === activeFetchTokenRef.current) {
+        isLoadingMoreRef.current = false;
+        setIsLoadingMore(false);
+      }
     }
-  }, [isConnected, isDemoMode, activePeer, activeAccountId]);
+  }, [isDemoMode, isConnected, isLoading, hasMoreFiles, activePeer, activeChatTitle, getCacheKey]);
 
   // Fetch full user profile details (Bio, Numeric ID, DC, Premium)
   const fetchFullUser = useCallback(async () => {
@@ -472,6 +862,7 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
 
       setIsSwitchingAccount(true);
       setIsLoading(true);
+      channelCacheRef.current.clear();
       setSelectedFileIds([]);
       setSearchQuery('');
       setActivePeerState('me');
@@ -715,6 +1106,7 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
       const remaining = currentAccounts.filter((a) => a.id !== accountId);
       saveAccountsToStorage(remaining);
       setAccounts(remaining);
+      channelCacheRef.current.clear();
 
       if (activeAccountId === accountId || user?.id === accountId) {
         if (remaining.length > 0) {
@@ -729,7 +1121,7 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
           localStorage.removeItem(ACTIVE_ACCOUNT_ID_KEY);
           localStorage.removeItem(LEGACY_TOKEN_KEY);
           setFiles([]);
-          setStats(null);
+          setHasMoreFiles(false);
         }
       }
     },
@@ -737,6 +1129,7 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
   );
 
   const disconnectTelegram = async () => {
+    channelCacheRef.current.clear();
     if (isDemoMode) {
       setIsDemoMode(false);
       localStorage.removeItem('telecloud_mode');
@@ -747,7 +1140,6 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
       }
       setUser(null);
       setFiles([]);
-      setStats(null);
       return;
     }
 
@@ -768,7 +1160,6 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(ACTIVE_ACCOUNT_ID_KEY);
     localStorage.removeItem(LEGACY_TOKEN_KEY);
     setFiles([]);
-    setStats(null);
   };
 
   const deleteFile = async (id: number): Promise<boolean> => {
@@ -788,6 +1179,14 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
       if (data.success) {
         setFiles(prev => prev.filter(f => f.id !== id));
         setSelectedFileIds(prev => prev.filter(fid => fid !== id));
+        const cacheKey = getCacheKey();
+        if (channelCacheRef.current.has(cacheKey)) {
+          const c = channelCacheRef.current.get(cacheKey)!;
+          channelCacheRef.current.set(cacheKey, {
+            ...c,
+            files: c.files.filter(f => f.id !== id),
+          });
+        }
         return true;
       }
       return false;
@@ -834,6 +1233,14 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
       if (deletedIds.size > 0) {
         setFiles(prev => prev.filter(f => !deletedIds.has(f.id)));
         setSelectedFileIds(prev => prev.filter(id => !deletedIds.has(id)));
+        const cacheKey = getCacheKey();
+        if (channelCacheRef.current.has(cacheKey)) {
+          const c = channelCacheRef.current.get(cacheKey)!;
+          channelCacheRef.current.set(cacheKey, {
+            ...c,
+            files: c.files.filter(f => !deletedIds.has(f.id)),
+          });
+        }
         return true;
       }
       return false;
@@ -845,37 +1252,40 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
   // Extract all unique file extensions in the current view
   const availableExtensions = React.useMemo(() => {
     const exts = new Set<string>();
-    files.forEach(f => {
+    const source = activeTab === 'favorites' ? favoriteFiles : files;
+    source.forEach((f) => {
       const ext = f.filename.split('.').pop()?.toLowerCase();
       if (ext && ext !== f.filename.toLowerCase()) {
         exts.add(`.${ext}`);
       }
     });
     return Array.from(exts);
-  }, [files]);
+  }, [files, favoriteFiles, activeTab]);
 
   // Filtering and Sorting
   const filteredFiles = React.useMemo(() => {
-    let result = [...files];
+    // When activeTab is 'favorites', use the global list of favorite files across ALL chats & channels
+    let result = activeTab === 'favorites' ? [...favoriteFiles] : [...files];
 
     // Category filter
     if (selectedCategory !== 'all') {
-      result = result.filter(f => f.category === selectedCategory);
+      result = result.filter((f) => f.category === selectedCategory);
     }
 
     // Extension filter
     if (selectedExtension) {
-      result = result.filter(f => f.filename.toLowerCase().endsWith(selectedExtension.toLowerCase()));
+      result = result.filter((f) => f.filename.toLowerCase().endsWith(selectedExtension.toLowerCase()));
     }
 
     // Search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       result = result.filter(
-        f =>
+        (f) =>
           f.filename.toLowerCase().includes(q) ||
           f.caption.toLowerCase().includes(q) ||
-          f.mimeType.toLowerCase().includes(q)
+          f.mimeType.toLowerCase().includes(q) ||
+          (f.originChatTitle && f.originChatTitle.toLowerCase().includes(q))
       );
     }
 
@@ -883,9 +1293,9 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
     result.sort((a, b) => {
       switch (sortOption) {
         case 'date_desc':
-          return b.date - a.date;
+          return (b.starredAt || b.date) - (a.starredAt || a.date);
         case 'date_asc':
-          return a.date - b.date;
+          return (a.starredAt || a.date) - (b.starredAt || b.date);
         case 'size_desc':
           return b.size - a.size;
         case 'size_asc':
@@ -895,12 +1305,12 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         case 'name_desc':
           return b.filename.localeCompare(a.filename);
         default:
-          return b.date - a.date;
+          return (b.starredAt || b.date) - (a.starredAt || a.date);
       }
     });
 
     return result;
-  }, [files, selectedCategory, selectedExtension, searchQuery, sortOption]);
+  }, [files, activeTab, favoriteFiles, selectedCategory, selectedExtension, searchQuery, sortOption]);
 
   const selectAllFiltered = useCallback(() => {
     const allFilteredIds = filteredFiles.map(f => f.id);
@@ -1243,7 +1653,14 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         viewMode,
         setViewMode,
         refreshFiles,
+        loadMoreFiles,
+        hasMoreFiles,
+        isLoadingMore,
         deleteFile,
+        favoriteFiles,
+        favoriteFileIds,
+        toggleFavorite,
+        isFavorite,
         activeVideo,
         setActiveVideo,
         activeAudio,
@@ -1258,7 +1675,12 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         setIsLoginModalOpen,
         isUploadModalOpen,
         setIsUploadModalOpen,
+        isTelegramLinkModalOpen,
+        setIsTelegramLinkModalOpen,
+        isAccountDrawerOpen,
+        setIsAccountDrawerOpen,
         isPlayingAudio,
+
         setIsPlayingAudio,
         isVideoPiP,
         setIsVideoPiP,

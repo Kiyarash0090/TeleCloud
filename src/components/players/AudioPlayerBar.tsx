@@ -29,7 +29,9 @@ import { useTheme } from '../../context/ThemeContext';
 
 export function AudioPlayerBar() {
   const {
+    activeTab,
     files,
+    favoriteFiles,
     activeVideo,
     activeAudio,
     setActiveAudio,
@@ -71,8 +73,13 @@ export function AudioPlayerBar() {
   const [swipeOffsetX, setSwipeOffsetX] = useState(0);
 
   // Filter audio files for playlist
-  const audioFiles = files.filter((f) => f.category === 'audio');
-  const currentIndex = activeAudio ? audioFiles.findIndex((f) => f.id === activeAudio.id) : -1;
+  const sourceList = activeTab === 'favorites' ? favoriteFiles : files;
+  const audioFiles = sourceList.filter((f) => f.category === 'audio');
+  const currentIndex = activeAudio
+    ? audioFiles.findIndex(
+        (f) => f.id === activeAudio.id && (f.originPeer || 'me') === (activeAudio.originPeer || 'me')
+      )
+    : -1;
 
   const effectiveDuration =
     activeAudio?.duration && activeAudio.duration > 0

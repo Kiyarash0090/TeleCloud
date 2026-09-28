@@ -40,11 +40,14 @@ export function VideoPlayerModal({
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const { t, lang } = useTheme();
-  const { files, setActiveVideo, setIsPlayingAudio, isVideoPiP, setIsVideoPiP, selectedPeer } = useTelegram();
+  const { activeTab, files, favoriteFiles, setActiveVideo, setIsPlayingAudio, isVideoPiP, setIsVideoPiP, activePeer } = useTelegram();
 
   // Video playlist for next/prev navigation
-  const videoFiles = files.filter(f => f.category === 'videos');
-  const currentIndex = videoFiles.findIndex(f => f.id === file.id);
+  const sourceList = activeTab === 'favorites' ? favoriteFiles : files;
+  const videoFiles = sourceList.filter(f => f.category === 'videos');
+  const currentIndex = videoFiles.findIndex(
+    f => f.id === file.id && (f.originPeer || 'me') === (file.originPeer || 'me')
+  );
 
   // Determine if format typically needs transcoding
   const ext = file.filename.split('.').pop()?.toLowerCase() || '';
@@ -97,6 +100,26 @@ export function VideoPlayerModal({
     return Math.min(320, Math.max(220, window.innerWidth - 24));
   });
   const [isPipInteracting, setIsPipInteracting] = useState(false);
+  const [showPipControls, setShowPipControls] = useState(true);
+  const pipControlsTimeoutRef = useRef<any>(null);
+  const pipTapMovedRef = useRef(false);
+
+  const triggerPipControls = useCallback(() => {
+    setShowPipControls(true);
+    if (pipControlsTimeoutRef.current) clearTimeout(pipControlsTimeoutRef.current);
+    pipControlsTimeoutRef.current = setTimeout(() => {
+      setShowPipControls(false);
+    }, 2500);
+  }, []);
+
+  useEffect(() => {
+    if (isVideoPiP) {
+      triggerPipControls();
+    }
+    return () => {
+      if (pipControlsTimeoutRef.current) clearTimeout(pipControlsTimeoutRef.current);
+    };
+  }, [isVideoPiP, triggerPipControls]);
 
   // Mutable refs for 120fps Direct GPU DOM updates
   const pipPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -183,6 +206,9 @@ export function VideoPlayerModal({
       if (pipInteractionTypeRef.current === 'drag') {
         const dx = e.clientX - pipDragStartRef.current.startX;
         const dy = e.clientY - pipDragStartRef.current.startY;
+        if (Math.hypot(dx, dy) > 6) {
+          pipTapMovedRef.current = true;
+        }
         const pipW = pipWidthRef.current;
         const pipH = (pipW * 10) / 16;
 
@@ -335,6 +361,7 @@ export function VideoPlayerModal({
 
   const startPipDrag = (clientX: number, clientY: number) => {
     pipInteractionTypeRef.current = 'drag';
+    pipTapMovedRef.current = false;
     setIsPipInteracting(true);
 
     if (containerRef.current) {
@@ -404,11 +431,12 @@ export function VideoPlayerModal({
     : `${window.location.origin}${file.directUrl}`;
 
   const filePeer = (() => {
+    if (file.originPeer) return file.originPeer;
     try {
       const urlObj = new URL(baseUrl);
-      return urlObj.searchParams.get('peer') || selectedPeer || 'me';
+      return urlObj.searchParams.get('peer') || activePeer || 'me';
     } catch {
-      return selectedPeer || 'me';
+      return activePeer || 'me';
     }
   })();
   
@@ -774,6 +802,11 @@ export function VideoPlayerModal({
           top: 0,
           left: 0,
         }}
+        onMouseEnter={() => {
+          if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+            triggerPipControls();
+          }
+        }}
         className={`fixed z-50 aspect-16/10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.7)] border border-white/25 bg-zinc-950/85 backdrop-blur-2xl backdrop-saturate-150 group/pip select-none flex flex-col justify-between ring-1 ring-white/10 pip-smooth-container ${
           isPipInteracting ? 'ring-2 ring-sky-400 shadow-2xl' : 'cursor-default'
         }`}
@@ -781,36 +814,56 @@ export function VideoPlayerModal({
         {/* Telegram-style Interactive Corner Resize Handles */}
         {/* Bottom-Right (SE) */}
         <div 
-          onPointerDown={(e) => startPipResize(e, 'se')}
+          onPointerDown={(e) => {
+            triggerPipControls();
+            startPipResize(e, 'se');
+          }}
           title="تغییر اندازه مینی‌پلیر"
-          className="absolute -bottom-1 -right-1 w-7 h-7 z-50 cursor-se-resize flex items-end justify-end p-1.5 opacity-60 hover:opacity-100 group-hover/pip:opacity-100 transition-opacity touch-none"
+          className={`absolute -bottom-1 -right-1 w-7 h-7 z-50 cursor-se-resize flex items-end justify-end p-1.5 transition-opacity duration-200 touch-none ${
+            showPipControls ? 'opacity-70 hover:opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
         >
           <div className="w-2.5 h-2.5 border-r-2 border-b-2 border-sky-400 rounded-br-sm shadow-sm" />
         </div>
 
         {/* Bottom-Left (SW) */}
         <div 
-          onPointerDown={(e) => startPipResize(e, 'sw')}
+          onPointerDown={(e) => {
+            triggerPipControls();
+            startPipResize(e, 'sw');
+          }}
           title="تغییر اندازه مینی‌پلیر"
-          className="absolute -bottom-1 -left-1 w-7 h-7 z-50 cursor-sw-resize flex items-end justify-start p-1.5 opacity-60 hover:opacity-100 group-hover/pip:opacity-100 transition-opacity touch-none"
+          className={`absolute -bottom-1 -left-1 w-7 h-7 z-50 cursor-sw-resize flex items-end justify-start p-1.5 transition-opacity duration-200 touch-none ${
+            showPipControls ? 'opacity-70 hover:opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
         >
           <div className="w-2.5 h-2.5 border-l-2 border-b-2 border-sky-400 rounded-bl-sm shadow-sm" />
         </div>
 
         {/* Top-Right (NE) */}
         <div 
-          onPointerDown={(e) => startPipResize(e, 'ne')}
+          onPointerDown={(e) => {
+            triggerPipControls();
+            startPipResize(e, 'ne');
+          }}
           title="تغییر اندازه مینی‌پلیر"
-          className="absolute -top-1 -right-1 w-6 h-6 z-50 cursor-ne-resize flex items-start justify-end p-1.5 opacity-40 hover:opacity-100 group-hover/pip:opacity-100 transition-opacity touch-none"
+          className={`absolute -top-1 -right-1 w-6 h-6 z-50 cursor-ne-resize flex items-start justify-end p-1.5 transition-opacity duration-200 touch-none ${
+            showPipControls ? 'opacity-50 hover:opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
         >
           <div className="w-2 h-2 border-r-2 border-t-2 border-sky-400 rounded-tr-sm shadow-sm" />
         </div>
 
         {/* Top-Left (NW) */}
         <div 
-          onPointerDown={(e) => startPipResize(e, 'nw')}
+          onPointerDown={(e) => {
+            triggerPipControls();
+            startPipResize(e, 'nw');
+          }}
           title="تغییر اندازه مینی‌پلیر"
-          className="absolute -top-1 -left-1 w-6 h-6 z-50 cursor-nw-resize flex items-start justify-start p-1.5 opacity-40 hover:opacity-100 group-hover/pip:opacity-100 transition-opacity touch-none"
+          className={`absolute -top-1 -left-1 w-6 h-6 z-50 cursor-nw-resize flex items-start justify-start p-1.5 transition-opacity duration-200 touch-none ${
+            showPipControls ? 'opacity-50 hover:opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
         >
           <div className="w-2 h-2 border-l-2 border-t-2 border-sky-400 rounded-tl-sm shadow-sm" />
         </div>
@@ -819,10 +872,13 @@ export function VideoPlayerModal({
         <div 
           onPointerDown={(e) => {
             if ((e.target as HTMLElement).closest('button')) return;
+            triggerPipControls();
             startPipDrag(e.clientX, e.clientY);
           }}
           onDoubleClick={() => setIsVideoPiP(false)}
-          className="absolute top-0 inset-x-0 p-2 sm:p-2.5 bg-gradient-to-b from-black/85 via-black/40 to-transparent flex items-center justify-between gap-2 z-40 text-white backdrop-blur-[2px] cursor-grab active:cursor-grabbing touch-none"
+          className={`absolute top-0 inset-x-0 p-2 sm:p-2.5 bg-gradient-to-b from-black/85 via-black/40 to-transparent flex items-center justify-between gap-2 z-40 text-white backdrop-blur-[2px] cursor-grab active:cursor-grabbing touch-none transition-opacity duration-250 ${
+            showPipControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
         >
           <div className="flex items-center gap-1.5 min-w-0 flex-1 pointer-events-none">
             <GripHorizontal className="w-3.5 h-3.5 text-white/50 shrink-0" />
@@ -833,7 +889,9 @@ export function VideoPlayerModal({
           <div className="flex items-center gap-1 shrink-0 pointer-events-auto">
             {/* Quick Size Toggle (Mini / Normal / Large) */}
             <button
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
+                triggerPipControls();
                 const nextW = pipWidth < 300 ? 380 : pipWidth < 460 ? 520 : 260;
                 setPipWidth(nextW);
                 if (containerRef.current) {
@@ -859,7 +917,10 @@ export function VideoPlayerModal({
             {/* Native OS Picture-in-Picture Button */}
             {isNativePiPSupported && (
               <button
-                onClick={toggleNativeOSPiP}
+                onClick={(e) => {
+                  triggerPipControls();
+                  toggleNativeOSPiP(e);
+                }}
                 title={lang === 'fa' ? 'شناور خارج از مرورگر (OS PiP)' : 'Pop out to OS Floating Window'}
                 className={`p-1.5 rounded-lg transition active:scale-95 cursor-pointer backdrop-blur-sm ${
                   isNativePiPActive 
@@ -873,7 +934,10 @@ export function VideoPlayerModal({
 
             {/* Maximize back to full modal */}
             <button
-              onClick={() => setIsVideoPiP(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsVideoPiP(false);
+              }}
               title={lang === 'fa' ? 'بزرگ‌نمایی و بازگشت به پلیر کامل' : 'Maximize Video Player'}
               className="p-1.5 rounded-lg bg-white/15 hover:bg-white/30 text-white transition active:scale-95 cursor-pointer backdrop-blur-sm"
             >
@@ -882,7 +946,10 @@ export function VideoPlayerModal({
 
             {/* Close */}
             <button
-              onClick={onClose}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
               title={lang === 'fa' ? 'بستن ویدیو' : 'Close Video'}
               className="p-1.5 rounded-lg bg-white/15 hover:bg-rose-600 text-white transition active:scale-95 cursor-pointer backdrop-blur-sm"
             >
@@ -892,10 +959,25 @@ export function VideoPlayerModal({
         </div>
 
 
-        {/* Video Element Viewport */}
+        {/* Video Element Viewport (Supports Drag + Tap to Toggle Controls) */}
         <div 
-          className="relative w-full h-full flex items-center justify-center cursor-pointer bg-black/40 backdrop-blur-xs"
-          onClick={togglePlay}
+          className="relative w-full h-full flex items-center justify-center cursor-pointer bg-black/40 backdrop-blur-xs touch-none"
+          onPointerDown={(e) => {
+            if ((e.target as HTMLElement).closest('button')) return;
+            startPipDrag(e.clientX, e.clientY);
+          }}
+          onClick={() => {
+            if (pipTapMovedRef.current) {
+              pipTapMovedRef.current = false;
+              return;
+            }
+            if (showPipControls) {
+              if (pipControlsTimeoutRef.current) clearTimeout(pipControlsTimeoutRef.current);
+              setShowPipControls(false);
+            } else {
+              triggerPipControls();
+            }
+          }}
         >
           <video
             ref={videoRef}
@@ -917,26 +999,27 @@ export function VideoPlayerModal({
             }}
             onPause={() => setIsPlaying(false)}
             onEnded={() => setIsPlaying(false)}
-            className="w-full h-full object-contain pointer-events-auto"
+            className="w-full h-full object-contain pointer-events-none"
           />
 
-          {/* Center Play/Pause & Skip Controls Overlay on Hover/Touch */}
+          {/* Center Play/Pause & Skip Controls Overlay (Auto-Hides, Shown on Tap) */}
           <div
-            className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity z-30 ${
-              !isPlaying
-                ? 'opacity-100 bg-black/35'
-                : 'opacity-100 bg-black/15 md:opacity-0 md:bg-black/40 md:group-hover/pip:opacity-100'
+            className={`absolute inset-0 flex items-center justify-center transition-all duration-250 z-30 ${
+              showPipControls
+                ? 'opacity-100 bg-black/30 pointer-events-auto'
+                : 'opacity-0 pointer-events-none'
             }`}
           >
             <div
-              className={`flex items-center gap-2.5 pointer-events-auto ${
-                isPlaying ? 'md:pointer-events-none md:group-hover/pip:pointer-events-auto' : ''
+              className={`flex items-center gap-2.5 transition-transform duration-200 ${
+                showPipControls ? 'scale-100 pointer-events-auto' : 'scale-90 pointer-events-none'
               }`}
             >
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   skipTime(-10);
+                  triggerPipControls();
                 }}
                 className="p-2 rounded-full bg-black/65 hover:bg-black/85 text-white border border-white/20 backdrop-blur-md shadow-lg hover:scale-110 active:scale-95 transition cursor-pointer flex items-center justify-center"
                 title="۱۰ ثانیه عقب"
@@ -947,6 +1030,7 @@ export function VideoPlayerModal({
                 onClick={(e) => {
                   e.stopPropagation();
                   togglePlay();
+                  triggerPipControls();
                 }}
                 className="w-9 h-9 rounded-full bg-white text-zinc-950 hover:bg-sky-400 hover:text-white flex items-center justify-center transition shadow-xl active:scale-95 cursor-pointer"
               >
@@ -956,6 +1040,7 @@ export function VideoPlayerModal({
                 onClick={(e) => {
                   e.stopPropagation();
                   skipTime(10);
+                  triggerPipControls();
                 }}
                 className="p-2 rounded-full bg-black/65 hover:bg-black/85 text-white border border-white/20 backdrop-blur-md shadow-lg hover:scale-110 active:scale-95 transition cursor-pointer flex items-center justify-center"
                 title="۱۰ ثانیه جلو"
@@ -966,11 +1051,19 @@ export function VideoPlayerModal({
           </div>
         </div>
 
-        {/* PiP Mini Bottom Progress Bar */}
-        <div className="absolute bottom-0 inset-x-0 p-2 bg-gradient-to-t from-black/90 via-black/50 to-transparent z-40 flex flex-col gap-0.5 pointer-events-none">
-          <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden">
+        {/* PiP Mini Bottom Progress Bar (Visible when controls are shown) */}
+        <div
+          className={`absolute bottom-0 inset-x-0 p-2 bg-gradient-to-t from-black/90 via-black/50 to-transparent z-40 flex flex-col gap-0.5 pointer-events-none transition-opacity duration-250 ${
+            showPipControls ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden relative">
+            <div
+              className="absolute inset-y-0 left-0 bg-white/30 rounded-full transition-all duration-200"
+              style={{ width: `${bufferedPercent}%` }}
+            />
             <div 
-              className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all"
+              className="relative h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -978,6 +1071,22 @@ export function VideoPlayerModal({
             <span>{formatDuration(currentTime)}</span>
             <span>{formatDuration(effectiveDuration)}</span>
           </div>
+        </div>
+
+        {/* Unobtrusive 1px Bottom-Edge Progress Line (Visible when controls are hidden) */}
+        <div
+          className={`absolute bottom-0 inset-x-0 h-[1.5px] bg-white/10 z-40 pointer-events-none overflow-hidden transition-opacity duration-300 ${
+            showPipControls ? 'opacity-0' : 'opacity-90'
+          }`}
+        >
+          <div
+            className="absolute inset-y-0 left-0 bg-white/25 transition-all duration-200"
+            style={{ width: `${bufferedPercent}%` }}
+          />
+          <div
+            className="relative h-full bg-gradient-to-r from-blue-500 via-sky-400 to-cyan-300 transition-all duration-150"
+            style={{ width: `${progressPercent}%` }}
+          />
         </div>
       </div>
     );

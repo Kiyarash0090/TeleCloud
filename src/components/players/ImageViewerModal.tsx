@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   X, 
   ZoomIn, 
@@ -17,12 +17,18 @@ import {
   FlipVertical,
   Sliders,
   Sparkles,
-  Layers
+  Layers,
+  Loader2,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 import { TelegramFile } from '../../types';
 import { formatFileSize, formatDate } from '../../utils/formatters';
 import { useTheme } from '../../context/ThemeContext';
 import { useTelegram, useBackHandler } from '../../context/TelegramContext';
+
+// Global in-memory cache of successfully loaded full-res image URLs
+const loadedImageCache = new Set<string>();
 
 export function ImageViewerModal({ 
   file, 
@@ -31,7 +37,7 @@ export function ImageViewerModal({
   file: TelegramFile; 
   onClose: () => void;
 }) {
-  const { files, setActiveImage } = useTelegram();
+  const { activeTab, files, favoriteFiles, setActiveImage } = useTelegram();
   const { t, lang } = useTheme();
 
   const [zoom, setZoom] = useState(1);
@@ -42,6 +48,10 @@ export function ImageViewerModal({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showFilmstrip, setShowFilmstrip] = useState(true);
+
+  // Per-file loading & error tracking
+  const [loadingState, setLoadingState] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useBackHandler(showFilters, () => setShowFilters(false));
 
@@ -66,15 +76,40 @@ export function ImageViewerModal({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const imageUrl = file.directUrl.startsWith('http')
-    ? file.directUrl
-    : `${window.location.origin}${file.directUrl}`;
+  const getFullImageUrl = useCallback((f: TelegramFile) => {
+    return f.directUrl.startsWith('http')
+      ? f.directUrl
+      : `${window.location.origin}${f.directUrl}`;
+  }, []);
+
+  const imageUrl = getFullImageUrl(file);
+  const thumbnailSrc = file.thumbnailUrl || (file.directUrl.startsWith('http') ? file.directUrl : `${window.location.origin}${file.directUrl}`);
 
   // Image list for next/prev navigation
-  const imageFiles = files.filter(f => f.category === 'images');
-  const currentIndex = imageFiles.findIndex(f => f.id === file.id);
+  const sourceList = activeTab === 'favorites' ? favoriteFiles : files;
+  const imageFiles = sourceList.filter(f => f.category === 'images');
+  const currentIndex = imageFiles.findIndex(
+    f => f.id === file.id && (f.originPeer || 'me') === (file.originPeer || 'me')
+  );
 
-  // Reset adjustments on file change
+  // Preload adjacent images (Next 2, Prev 1) in background for instant switching
+  useEffect(() => {
+    const imagesToPreload: TelegramFile[] = [];
+    if (currentIndex < imageFiles.length - 1) imagesToPreload.push(imageFiles[currentIndex + 1]);
+    if (currentIndex < imageFiles.length - 2) imagesToPreload.push(imageFiles[currentIndex + 2]);
+    if (currentIndex > 0) imagesToPreload.push(imageFiles[currentIndex - 1]);
+
+    imagesToPreload.forEach(imgFile => {
+      const url = getFullImageUrl(imgFile);
+      if (!loadedImageCache.has(url)) {
+        const img = new Image();
+        img.src = url;
+        img.onload = () => loadedImageCache.add(url);
+      }
+    });
+  }, [currentIndex, imageFiles, getFullImageUrl]);
+
+  // Reset adjustments and initialize loading state on file change
   useEffect(() => {
     setZoom(1);
     setRotation(0);
@@ -83,7 +118,14 @@ export function ImageViewerModal({
     setPanOffset({ x: 0, y: 0 });
     setSwipeDelta({ x: 0, y: 0 });
     resetFilters();
-  }, [file.id]);
+
+    const url = getFullImageUrl(file);
+    if (loadedImageCache.has(url)) {
+      setLoadingState('loaded');
+    } else {
+      setLoadingState('loading');
+    }
+  }, [file.id, getFullImageUrl, reloadKey]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -486,7 +528,7 @@ export function ImageViewerModal({
         {currentIndex > 0 && (
           <button
             onClick={handlePrev}
-            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-zinc-950/60 hover:bg-zinc-900/80 text-white backdrop-blur-2xl border border-white/15 flex items-center justify-center transition shadow-2xl hover:scale-110 active:scale-95 ring-1 ring-white/10"
+            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-zinc-950/60 hover:bg-zinc-900/80 text-white backdrop-blur-2xl border border-white/15 flex items-center justify-center transition shadow-2xl hover:scale-110 active:scale-95 ring-1 ring-white/10 cursor-pointer"
             title="تصویر قبلی"
           >
             <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -497,25 +539,80 @@ export function ImageViewerModal({
         {currentIndex < imageFiles.length - 1 && (
           <button
             onClick={handleNext}
-            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-zinc-950/60 hover:bg-zinc-900/80 text-white backdrop-blur-2xl border border-white/15 flex items-center justify-center transition shadow-2xl hover:scale-110 active:scale-95 ring-1 ring-white/10"
+            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-zinc-950/60 hover:bg-zinc-900/80 text-white backdrop-blur-2xl border border-white/15 flex items-center justify-center transition shadow-2xl hover:scale-110 active:scale-95 ring-1 ring-white/10 cursor-pointer"
             title="تصویر بعدی"
           >
             <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         )}
 
-        {/* Displayed Image with Zoom/Pan/Swipe/Rotate/Flip & Filter Matrix */}
+        {/* Displayed Image Container with Zoom/Pan/Swipe/Rotate/Flip & Progressive Loading Layers */}
         <div 
-          className={`${isSwiping || isDragging ? 'transition-none' : 'transition-transform duration-200 ease-out'} flex items-center justify-center pointer-events-none`}
+          className={`relative ${isSwiping || isDragging ? 'transition-none' : 'transition-transform duration-200 ease-out'} flex items-center justify-center pointer-events-none max-h-[72dvh] max-w-[92vw] sm:max-w-[88vw]`}
           style={{
             transform: `translate(${zoom > 1 ? panOffset.x : swipeDelta.x}px, ${zoom > 1 ? panOffset.y : swipeDelta.y}px) scale(${swipeScale}) rotate(${rotation}deg) scaleX(${isFlippedH ? -1 : 1}) scaleY(${isFlippedV ? -1 : 1})`,
           }}
         >
+          {/* Layer 1: Instant Low-Res Thumbnail Blur Placeholder (Eliminates showing old photo) */}
+          {loadingState === 'loading' && (
+            <div className="relative flex items-center justify-center overflow-hidden rounded-2xl">
+              <img
+                src={thumbnailSrc}
+                alt=""
+                aria-hidden="true"
+                className="max-h-[72dvh] max-w-[92vw] sm:max-w-[88vw] object-contain rounded-2xl blur-md scale-105 opacity-70 filter brightness-90 transition-opacity duration-300"
+              />
+              
+              {/* Telegram-style Circular Loading Spinner Overlay */}
+              <div className="absolute inset-0 m-auto flex flex-col items-center justify-center gap-2.5 z-20 pointer-events-none">
+                <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-xl border border-white/20 flex items-center justify-center shadow-2xl">
+                  <Loader2 className="w-6 h-6 text-rose-400 animate-spin" />
+                </div>
+                <span className="text-[11px] font-bold text-zinc-200 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 shadow-lg">
+                  {lang === 'fa' ? 'درحال دریافت...' : 'Loading image...'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Layer 2: Error State with Retry Button */}
+          {loadingState === 'error' && (
+            <div className="flex flex-col items-center justify-center p-8 rounded-3xl bg-black/60 backdrop-blur-2xl border border-rose-500/30 text-white gap-3 pointer-events-auto shadow-2xl">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/30">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <p className="text-xs font-bold text-zinc-200">
+                {lang === 'fa' ? 'خطا در بارگذاری تصویر' : 'Failed to load image'}
+              </p>
+              <button
+                onClick={() => {
+                  setLoadingState('loading');
+                  setReloadKey(k => k + 1);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition active:scale-95 shadow-lg shadow-rose-600/30 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>{lang === 'fa' ? 'تلاش مجدد' : 'Retry'}</span>
+              </button>
+            </div>
+          )}
+
+          {/* Layer 3: High-Res Full Image with Discrete Key per File ID */}
           <img
+            key={`${file.id}-${reloadKey}`}
             src={imageUrl}
             alt={file.filename}
             style={{ filter: filterStyle }}
-            className="max-h-[72dvh] max-w-[92vw] sm:max-w-[88vw] object-contain rounded-2xl shadow-2xl pointer-events-auto ring-1 ring-white/10"
+            onLoad={() => {
+              loadedImageCache.add(imageUrl);
+              setLoadingState('loaded');
+            }}
+            onError={() => {
+              setLoadingState('error');
+            }}
+            className={`max-h-[72dvh] max-w-[92vw] sm:max-w-[88vw] object-contain rounded-2xl shadow-2xl pointer-events-auto ring-1 ring-white/10 transition-opacity duration-250 ease-out ${
+              loadingState === 'loaded' ? 'opacity-100' : 'opacity-0 absolute inset-0 m-auto'
+            }`}
           />
         </div>
       </div>
@@ -530,7 +627,7 @@ export function ImageViewerModal({
               <button
                 key={imgFile.id}
                 onClick={() => setActiveImage(imgFile)}
-                className={`relative w-11 h-11 sm:w-12 sm:h-12 rounded-xl overflow-hidden shrink-0 border-2 transition-all duration-200 ${
+                className={`relative w-11 h-11 sm:w-12 sm:h-12 rounded-xl overflow-hidden shrink-0 border-2 transition-all duration-200 cursor-pointer ${
                   imgFile.id === file.id 
                     ? 'border-rose-500 scale-110 shadow-[0_0_12px_rgba(244,63,94,0.6)] z-10 ring-2 ring-white/30' 
                     : 'border-white/20 opacity-60 hover:opacity-100 hover:border-white/50'
@@ -548,7 +645,7 @@ export function ImageViewerModal({
 
         {/* Controls Pill (Glassmorphic) */}
         <div className="bg-zinc-950/65 dark:bg-zinc-950/70 backdrop-blur-2xl backdrop-saturate-150 px-3 sm:px-4 py-2 rounded-2xl sm:rounded-3xl border border-white/15 flex items-center gap-1.5 sm:gap-3 text-white text-xs shadow-[0_16px_50px_rgba(0,0,0,0.6)] ring-1 ring-white/10 max-w-[95vw] overflow-x-auto scrollbar-none">
-          <button onClick={handleZoomOut} title="کوچک‌نمایی (-)" className="p-1.5 rounded-lg hover:bg-white/10 hover:text-rose-400 transition shrink-0">
+          <button onClick={handleZoomOut} title="کوچک‌نمایی (-)" className="p-1.5 rounded-lg hover:bg-white/10 hover:text-rose-400 transition shrink-0 cursor-pointer">
             <ZoomOut className="w-4 h-4" />
           </button>
 
@@ -556,25 +653,25 @@ export function ImageViewerModal({
             {Math.round(zoom * 100)}%
           </span>
 
-          <button onClick={handleZoomIn} title="بزرگ‌نمایی (+)" className="p-1.5 rounded-lg hover:bg-white/10 hover:text-rose-400 transition shrink-0">
+          <button onClick={handleZoomIn} title="بزرگ‌نمایی (+)" className="p-1.5 rounded-lg hover:bg-white/10 hover:text-rose-400 transition shrink-0 cursor-pointer">
             <ZoomIn className="w-4 h-4" />
           </button>
 
           <div className="w-px h-4 bg-white/20 mx-0.5 shrink-0" />
 
-          <button onClick={handleRotateCcw} title="چرخش ۹۰- درجه" className="p-1.5 rounded-lg hover:bg-white/10 hover:text-rose-400 transition hidden sm:flex shrink-0">
+          <button onClick={handleRotateCcw} title="چرخش ۹۰- درجه" className="p-1.5 rounded-lg hover:bg-white/10 hover:text-rose-400 transition hidden sm:flex shrink-0 cursor-pointer">
             <RotateCcw className="w-4 h-4" />
           </button>
 
-          <button onClick={handleRotateCw} title="چرخش ۹۰ درجه (R)" className="p-1.5 rounded-lg hover:bg-white/10 hover:text-rose-400 transition shrink-0">
+          <button onClick={handleRotateCw} title="چرخش ۹۰ درجه (R)" className="p-1.5 rounded-lg hover:bg-white/10 hover:text-rose-400 transition shrink-0 cursor-pointer">
             <RotateCw className="w-4 h-4" />
           </button>
 
-          <button onClick={handleFlipH} title="آینه افقی (F)" className="p-1.5 rounded-lg hover:bg-white/10 hover:text-rose-400 transition shrink-0">
+          <button onClick={handleFlipH} title="آینه افقی (F)" className="p-1.5 rounded-lg hover:bg-white/10 hover:text-rose-400 transition shrink-0 cursor-pointer">
             <FlipHorizontal className="w-4 h-4" />
           </button>
 
-          <button onClick={handleFlipV} title="آینه عمودی" className="p-1.5 rounded-lg hover:bg-white/10 hover:text-rose-400 transition hidden sm:flex shrink-0">
+          <button onClick={handleFlipV} title="آینه عمودی" className="p-1.5 rounded-lg hover:bg-white/10 hover:text-rose-400 transition hidden sm:flex shrink-0 cursor-pointer">
             <FlipVertical className="w-4 h-4" />
           </button>
 
@@ -584,7 +681,7 @@ export function ImageViewerModal({
             <button
               onClick={() => setShowFilmstrip(!showFilmstrip)}
               title="نمایش نوار تصاویر"
-              className={`p-1.5 rounded-lg transition shrink-0 ${
+              className={`p-1.5 rounded-lg transition shrink-0 cursor-pointer ${
                 showFilmstrip ? 'text-rose-400 bg-rose-500/20 border border-rose-500/30' : 'text-zinc-400 hover:bg-white/10 hover:text-white'
               }`}
             >
@@ -595,7 +692,7 @@ export function ImageViewerModal({
           <button 
             onClick={handleReset} 
             title="ریست مقیاس و جهت (0)" 
-            className="text-[11px] font-medium px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-xl transition text-zinc-200 hover:text-white shrink-0 border border-white/10"
+            className="text-[11px] font-medium px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-xl transition text-zinc-200 hover:text-white shrink-0 border border-white/10 cursor-pointer"
           >
             ریست
           </button>

@@ -14,7 +14,9 @@ import { formatFileSize } from '../utils/formatters';
 
 export function MultiSelectBar() {
   const {
+    activeTab,
     files,
+    favoriteFiles,
     filteredFiles,
     selectedFileIds,
     isSelectionMode,
@@ -25,7 +27,7 @@ export function MultiSelectBar() {
     activePeer,
   } = useTelegram();
   const { lang } = useTheme();
-  const isSavedMessages = !activePeer || activePeer === 'me';
+  const isSavedMessages = (!activePeer || activePeer === 'me') && activeTab === 'files';
 
   const [copiedBatch, setCopiedBatch] = useState(false);
   const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
@@ -33,7 +35,8 @@ export function MultiSelectBar() {
 
   if (!isSelectionMode) return null;
 
-  const selectedFiles = files.filter((f) => selectedFileIds.includes(f.id));
+  const sourceFiles = activeTab === 'favorites' ? favoriteFiles : files;
+  const selectedFiles = sourceFiles.filter((f) => selectedFileIds.includes(f.id));
   const totalSelectedSize = selectedFiles.reduce((acc, f) => acc + f.size, 0);
   const allFilteredSelected =
     filteredFiles.length > 0 &&

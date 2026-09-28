@@ -15,6 +15,7 @@ import {
   Eye,
   FolderOpen,
   Upload,
+  Star,
 } from 'lucide-react';
 import { TelegramFile } from '../types';
 import { formatFileSize, formatDate, formatDuration, getFileExtension, getFileColor } from '../utils/formatters';
@@ -23,6 +24,7 @@ import { useTheme } from '../context/ThemeContext';
 
 export function FileList({ files }: { files: TelegramFile[] }) {
   const {
+    activeTab,
     setActiveVideo,
     setActiveAudio,
     setIsPlayingAudio,
@@ -36,6 +38,8 @@ export function FileList({ files }: { files: TelegramFile[] }) {
     toggleSelectFile,
     selectAllFiltered,
     activePeer,
+    toggleFavorite,
+    isFavorite,
   } = useTelegram();
   const { t, lang } = useTheme();
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -46,6 +50,22 @@ export function FileList({ files }: { files: TelegramFile[] }) {
   const touchStartPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   if (files.length === 0) {
+    if (activeTab === 'favorites') {
+      return (
+        <div className="flex flex-col items-center justify-center py-16 sm:py-24 px-4 text-center bg-white/60 dark:bg-[#1e1f20]/60 rounded-3xl border border-dashed border-slate-200 dark:border-zinc-800">
+          <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-500 flex items-center justify-center mb-4">
+            <Star className="w-8 h-8 fill-amber-500/20" />
+          </div>
+          <h3 className="text-sm sm:text-base font-bold text-slate-800 dark:text-zinc-200 mb-1">
+            {t('noFavoritesFound')}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md">
+            {t('noFavoritesDesc')}
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col items-center justify-center py-16 sm:py-24 px-4 text-center bg-white/60 dark:bg-[#1e1f20]/60 rounded-3xl border border-dashed border-slate-200 dark:border-zinc-800">
         <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-500 flex items-center justify-center mb-4">
@@ -168,9 +188,10 @@ export function FileList({ files }: { files: TelegramFile[] }) {
           const colors = getFileColor(file.category);
           const ext = getFileExtension(file.filename);
           const isSelected = selectedFileIds.includes(file.id);
+          const isFav = isFavorite(file);
           return (
             <div
-              key={file.id}
+              key={`${file.originPeer || 'me'}_${file.id}`}
               onClick={() => handleRowClick(file)}
               onTouchStart={(e) => handleTouchStart(e, file.id)}
               onTouchMove={handleTouchMove}
@@ -223,12 +244,31 @@ export function FileList({ files }: { files: TelegramFile[] }) {
                     )}
                     <span>{formatFileSize(file.size)}</span>
                     {Boolean(file.duration && file.duration > 0) && <span>• {formatDuration(file.duration!)}</span>}
+                    {Boolean(file.originChatTitle && activeTab === 'favorites') && (
+                      <span className="text-amber-600 dark:text-amber-400 font-sans font-medium truncate">
+                        • {file.originChatTitle}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
 
               {!isSelectionMode && (
                 <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => {
+                      toggleFavorite(file);
+                      if (navigator.vibrate) navigator.vibrate(20);
+                    }}
+                    title={isFav ? t('removeFromFavorites') : t('addToFavorites')}
+                    className={`p-2 rounded-xl transition active:scale-90 ${
+                      isFav
+                        ? 'text-amber-500 bg-amber-50 dark:bg-amber-950/40'
+                        : 'text-slate-400 hover:text-amber-500'
+                    }`}
+                  >
+                    <Star className={`w-4 h-4 ${isFav ? 'fill-amber-500' : ''}`} />
+                  </button>
                   <button
                     onClick={(e) => handleCopy(e, file)}
                     className="p-2 rounded-xl text-slate-400 hover:text-blue-600 active:scale-90"
@@ -289,9 +329,10 @@ export function FileList({ files }: { files: TelegramFile[] }) {
               const colors = getFileColor(file.category);
               const ext = getFileExtension(file.filename);
               const isSelected = selectedFileIds.includes(file.id);
+              const isFav = isFavorite(file);
               return (
                 <tr
-                  key={file.id}
+                  key={`${file.originPeer || 'me'}_${file.id}`}
                   onClick={() => handleRowClick(file)}
                   className={`transition-colors cursor-pointer group ${
                     isSelected
@@ -326,11 +367,16 @@ export function FileList({ files }: { files: TelegramFile[] }) {
                         <p className="font-bold text-slate-800 dark:text-zinc-100 truncate">
                           {file.filename}
                         </p>
-                        {Boolean(file.duration && file.duration > 0) && (
-                          <p className="text-[11px] text-slate-400 font-mono">
-                            {formatDuration(file.duration!)}
-                          </p>
-                        )}
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                          {Boolean(file.duration && file.duration > 0) && (
+                            <span className="font-mono">{formatDuration(file.duration!)}</span>
+                          )}
+                          {Boolean(file.originChatTitle && activeTab === 'favorites') && (
+                            <span className="text-amber-600 dark:text-amber-400 font-medium truncate">
+                              {file.originChatTitle}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -361,6 +407,21 @@ export function FileList({ files }: { files: TelegramFile[] }) {
                         ) : (
                           <Eye className="w-4 h-4" />
                         )}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          toggleFavorite(file);
+                          if (navigator.vibrate) navigator.vibrate(20);
+                        }}
+                        title={isFav ? t('removeFromFavorites') : t('addToFavorites')}
+                        className={`p-2 rounded-xl transition cursor-pointer ${
+                          isFav
+                            ? 'text-amber-500 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50'
+                            : 'text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/40'
+                        }`}
+                      >
+                        <Star className={`w-4 h-4 ${isFav ? 'fill-amber-500' : ''}`} />
                       </button>
 
                       <button

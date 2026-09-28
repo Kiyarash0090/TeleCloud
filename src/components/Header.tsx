@@ -15,6 +15,8 @@ import {
   Folder,
   Layers,
   Sparkles,
+  Link2,
+  Star,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useTelegram, useBackHandler } from '../context/TelegramContext';
@@ -39,8 +41,11 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
     refreshFiles,
     setIsLoginModalOpen,
     setIsUploadModalOpen,
+    setIsTelegramLinkModalOpen,
     filteredFiles,
   } = useTelegram();
+
+
 
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -85,24 +90,24 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
   };
 
   return (
-    <header className="shrink-0 sticky top-0 z-40 w-full h-14 lg:h-16 border-b border-slate-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-[#131418]/90 backdrop-blur-xl px-3 sm:px-5 lg:px-6 flex items-center justify-between gap-3 transition-colors select-none">
+    <header className="shrink-0 sticky top-0 z-40 w-full h-12 sm:h-13 lg:h-15 border-b border-slate-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-[#131418]/90 backdrop-blur-xl px-2.5 sm:px-4 lg:px-6 flex items-center justify-between gap-2 sm:gap-3 transition-colors select-none">
       {/* Mobile Full-Width Search Overlay */}
       {mobileSearchOpen && (
-        <div className="fixed inset-x-0 top-0 h-14 bg-white dark:bg-[#131418] z-50 px-3 flex items-center gap-2 border-b border-slate-200 dark:border-zinc-800 sm:hidden animate-in fade-in duration-150">
+        <div className="fixed inset-x-0 top-0 h-12 bg-white dark:bg-[#131418] z-50 px-2.5 flex items-center gap-2 border-b border-slate-200 dark:border-zinc-800 sm:hidden animate-in fade-in duration-150">
           <div className="relative flex-1 flex items-center">
-            <Search className="w-4 h-4 text-blue-500 absolute start-3 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 text-blue-500 absolute start-2.5 pointer-events-none" />
             <input
               ref={mobileSearchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('searchPlaceholder')}
-              className="w-full ps-9 pe-8 py-2 bg-slate-100 dark:bg-zinc-800 border border-blue-500/40 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-full ps-8 pe-7 py-1.5 bg-slate-100 dark:bg-zinc-800 border border-blue-500/40 rounded-lg text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 absolute end-2"
+                className="p-0.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 absolute end-1.5"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -110,7 +115,7 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
           </div>
           <button
             onClick={() => setMobileSearchOpen(false)}
-            className="px-3 py-2 text-xs font-bold text-slate-600 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 rounded-xl active:scale-95 transition-transform shrink-0"
+            className="px-2.5 py-1.5 text-xs font-bold text-slate-600 dark:text-zinc-300 bg-slate-100 dark:bg-zinc-800 rounded-lg active:scale-95 transition-transform shrink-0"
           >
             {t('close')}
           </button>
@@ -118,23 +123,23 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
       )}
 
       {/* Left: Mobile Menu Toggle & Desktop Context Breadcrumbs */}
-      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 flex-1 min-w-0">
         {onToggleMobileMenu && (
           <button
             onClick={onToggleMobileMenu}
-            className="p-2 min-w-[38px] min-h-[38px] flex items-center justify-center rounded-xl text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-95 md:hidden shrink-0 transition-all"
+            className="p-1.5 min-w-[32px] min-h-[32px] flex items-center justify-center rounded-lg text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-95 md:hidden shrink-0 transition-all cursor-pointer"
             aria-label="Open menu"
           >
-            <Menu className="w-5 h-5" />
+            <Menu className="w-4 h-4" />
           </button>
         )}
 
         {/* Mobile Logo */}
         <div
           onClick={() => setActiveTab('files')}
-          className="flex md:hidden items-center gap-1.5 shrink-0 cursor-pointer"
+          className="flex md:hidden items-center gap-1 shrink-0 cursor-pointer"
         >
-          <div className="w-8 h-8 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center shadow-xs overflow-hidden p-1">
+          <div className="w-7 h-7 rounded-lg bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center shadow-xs overflow-hidden p-0.5">
             <img src="/favicon-96x96.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
         </div>
@@ -149,7 +154,7 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
             }}
             className="hover:text-blue-600 dark:hover:text-sky-400 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
           >
-            <div className="w-5 h-5 rounded-md overflow-hidden flex items-center justify-center shrink-0">
+            <div className="w-4.5 h-4.5 rounded-md overflow-hidden flex items-center justify-center shrink-0">
               <img src="/favicon-96x96.png" alt="Logo" className="w-full h-full object-contain" />
             </div>
             <span className="font-bold text-slate-800 dark:text-zinc-200">{t('appName')}</span>
@@ -161,17 +166,27 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
             <span className="font-bold text-blue-600 dark:text-sky-400 truncate">
               {t('accountDetails')}
             </span>
+          ) : activeTab === 'favorites' ? (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-bold text-amber-600 dark:text-amber-400 truncate flex items-center gap-1">
+                <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500 shrink-0" />
+                <span>{t('favorites')}</span>
+              </span>
+              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono tabular-nums">
+                ({filteredFiles.length})
+              </span>
+            </div>
           ) : (
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="font-bold text-slate-900 dark:text-white truncate">
                 {getCategoryLabel()}
               </span>
               {selectedExtension && (
-                <span className="px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-sky-400 font-mono text-[11px] font-bold">
+                <span className="px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-sky-400 font-mono text-[10px] font-bold">
                   {selectedExtension}
                 </span>
               )}
-              <span className="text-[11px] text-slate-400 dark:text-zinc-500 font-mono tabular-nums">
+              <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono tabular-nums">
                 ({filteredFiles.length})
               </span>
             </div>
@@ -181,40 +196,40 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
         {/* Mobile Search Trigger Bar */}
         <div
           onClick={() => setMobileSearchOpen(true)}
-          className="flex sm:hidden items-center gap-2 flex-1 min-w-0 py-1.5 px-2.5 rounded-xl bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/70 dark:border-zinc-700/60 text-slate-500 dark:text-zinc-400 cursor-pointer active:scale-[0.99] transition-all"
+          className="flex sm:hidden items-center gap-1.5 flex-1 min-w-0 py-1 px-2 rounded-lg bg-slate-100 dark:bg-zinc-800/80 border border-slate-200/70 dark:border-zinc-700/60 text-slate-500 dark:text-zinc-400 cursor-pointer active:scale-[0.99] transition-all"
         >
-          <Search className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 shrink-0" />
-          <span className="text-xs truncate font-medium">
+          <Search className="w-3 h-3 text-slate-400 dark:text-zinc-500 shrink-0" />
+          <span className="text-[11px] truncate font-medium">
             {searchQuery ? searchQuery : t('searchPlaceholder')}
           </span>
         </div>
       </div>
 
       {/* Center: Desktop Global Search Bar */}
-      <div className="hidden sm:block flex-1 max-w-lg lg:max-w-xl mx-2">
+      <div className="hidden sm:block flex-1 max-w-md lg:max-w-lg mx-2">
         <div className="relative group">
-          <Search className="w-4 h-4 text-slate-400 dark:text-zinc-500 group-focus-within:text-blue-500 absolute start-3.5 top-1/2 -translate-y-1/2 pointer-events-none transition-colors" />
+          <Search className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 group-focus-within:text-blue-500 absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none transition-colors" />
           <input
             ref={searchInputRef}
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('searchPlaceholder')}
-            className="w-full ps-10 pe-16 py-2 bg-slate-100/90 dark:bg-zinc-800/70 border border-slate-200/80 dark:border-zinc-700/60 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all shadow-2xs"
+            className="w-full ps-9 pe-14 py-1.5 bg-slate-100/90 dark:bg-zinc-800/70 border border-slate-200/80 dark:border-zinc-700/60 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 rounded-lg text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-2xs"
           />
-          <div className="absolute end-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          <div className="absolute end-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
             {searchQuery ? (
               <button
                 onClick={() => {
                   setSearchQuery('');
                   searchInputRef.current?.focus();
                 }}
-                className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition-colors cursor-pointer"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-3 h-3" />
               </button>
             ) : (
-              <kbd className="hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono font-medium text-slate-400 dark:text-zinc-500 bg-white/80 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-700 rounded-md pointer-events-none">
+              <kbd className="hidden lg:inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] font-mono font-medium text-slate-400 dark:text-zinc-500 bg-white/80 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-700 rounded pointer-events-none">
                 Ctrl K
               </kbd>
             )}
@@ -222,16 +237,16 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
         </div>
       </div>
 
-      {/* Right Controls: View Switcher, Upload, Refresh, Language, Theme, Account */}
-      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      {/* Right Controls: View Switcher, Refresh, Language, Theme */}
+      <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
         {/* View Mode Switcher */}
-        <div className="flex items-center bg-slate-100 dark:bg-zinc-800/90 p-0.5 sm:p-1 rounded-xl border border-slate-200/70 dark:border-zinc-700/70 shadow-2xs">
+        <div className="flex items-center bg-slate-100 dark:bg-zinc-800/90 p-0.5 rounded-lg border border-slate-200/70 dark:border-zinc-700/70 shadow-2xs">
           <button
             onClick={() => {
               setViewMode('grid');
-              if (activeTab !== 'files') setActiveTab('files');
+              if (activeTab === 'account') setActiveTab('files');
             }}
-            className={`p-1.5 rounded-lg transition-all cursor-pointer min-h-[30px] min-w-[30px] flex items-center justify-center ${
+            className={`p-1 rounded-md transition-all cursor-pointer min-h-[26px] min-w-[26px] flex items-center justify-center ${
               viewMode === 'grid'
                 ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-sky-400 shadow-xs font-bold'
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-700'
@@ -239,14 +254,14 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
             title={t('viewGrid')}
             aria-label={t('viewGrid')}
           >
-            <LayoutGrid className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <LayoutGrid className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => {
               setViewMode('list');
-              if (activeTab !== 'files') setActiveTab('files');
+              if (activeTab === 'account') setActiveTab('files');
             }}
-            className={`p-1.5 rounded-lg transition-all cursor-pointer min-h-[30px] min-w-[30px] flex items-center justify-center ${
+            className={`p-1 rounded-md transition-all cursor-pointer min-h-[26px] min-w-[26px] flex items-center justify-center ${
               viewMode === 'list'
                 ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-sky-400 shadow-xs font-bold'
                 : 'text-slate-500 dark:text-zinc-400 hover:text-slate-700'
@@ -254,46 +269,44 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
             title={t('viewList')}
             aria-label={t('viewList')}
           >
-            <List className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <List className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Refresh Files Button */}
         <button
-          onClick={refreshFiles}
+          onClick={() => refreshFiles(true)}
           disabled={isLoading}
-          className="p-2 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-xl text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
-          title="Refresh Files"
+          className="p-1.5 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-lg text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+          title={lang === 'fa' ? 'به‌روزرسانی لیست فایل‌ها' : 'Refresh Files'}
         >
-          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-blue-500' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-blue-500' : ''}`} />
         </button>
 
         {/* Language Switcher */}
         <button
           onClick={() => setLang(lang === 'fa' ? 'en' : 'fa')}
-          className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] rounded-xl text-xs font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
+          className="hidden sm:flex items-center gap-1 px-2 py-1 min-h-[28px] rounded-lg text-xs font-bold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
           title={t('language')}
         >
-          <Globe className="w-3.5 h-3.5 text-blue-500" />
-          <span className="uppercase font-mono">{lang === 'fa' ? 'EN' : 'فا'}</span>
+          <Globe className="w-3 h-3 text-blue-500" />
+          <span className="uppercase font-mono text-[11px]">{lang === 'fa' ? 'EN' : 'فا'}</span>
         </button>
 
         {/* Theme Switcher */}
         <button
           onClick={(e) => toggleTheme(e)}
-          className="hidden sm:flex p-2 min-w-[36px] min-h-[36px] items-center justify-center rounded-xl text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-90 transition-all cursor-pointer group/theme overflow-hidden"
+          className="hidden sm:flex p-1.5 min-w-[28px] min-h-[28px] items-center justify-center rounded-lg text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-90 transition-all cursor-pointer group/theme overflow-hidden"
           title={isDark ? t('lightMode') : t('darkMode')}
         >
-          <div className="relative w-4 h-4 flex items-center justify-center">
+          <div className="relative w-3.5 h-3.5 flex items-center justify-center">
             {isDark ? (
-              <Sun className="w-4 h-4 text-amber-400 theme-icon-spring theme-icon-sun animate-in zoom-in-50 spin-in-180 duration-500" />
+              <Sun className="w-3.5 h-3.5 text-amber-400 theme-icon-spring theme-icon-sun animate-in zoom-in-50 spin-in-180 duration-500" />
             ) : (
-              <Moon className="w-4 h-4 text-slate-700 dark:text-zinc-200 theme-icon-spring theme-icon-moon animate-in zoom-in-50 spin-in-[-180deg] duration-500" />
+              <Moon className="w-3.5 h-3.5 text-slate-700 dark:text-zinc-200 theme-icon-spring theme-icon-moon animate-in zoom-in-50 spin-in-[-180deg] duration-500" />
             )}
           </div>
         </button>
-
-
       </div>
     </header>
   );

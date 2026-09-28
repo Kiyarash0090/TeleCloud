@@ -14,7 +14,11 @@ export interface TelegramFile {
   height?: number;
   directUrl: string;
   downloadUrl: string;
+  streamUrl?: string;
   thumbnailUrl: string | null;
+  originPeer?: string;
+  originChatTitle?: string;
+  starredAt?: number;
 }
 
 export interface TelegramChat {
@@ -83,7 +87,7 @@ export interface UploadQueueItem {
   messageId?: number;
 }
 
-export type ActiveTab = 'files' | 'account';
+export type ActiveTab = 'files' | 'account' | 'favorites';
 export type ViewMode = 'grid' | 'list';
 export type SortOption = 'date_desc' | 'date_asc' | 'size_desc' | 'size_asc' | 'name_asc' | 'name_desc';
 export type Language = 'fa' | 'en';

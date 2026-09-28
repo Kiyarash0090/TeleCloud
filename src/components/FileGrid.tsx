@@ -1,5 +1,5 @@
 import React from 'react';
-import { FolderOpen, Upload, Plus } from 'lucide-react';
+import { FolderOpen, Upload, Star } from 'lucide-react';
 import { TelegramFile } from '../types';
 import { FileCard } from './FileCard';
 import { useTheme } from '../context/ThemeContext';
@@ -7,10 +7,26 @@ import { useTelegram } from '../context/TelegramContext';
 
 export function FileGrid({ files }: { files: TelegramFile[] }) {
   const { t } = useTheme();
-  const { setIsUploadModalOpen, activePeer } = useTelegram();
+  const { activeTab, setIsUploadModalOpen, activePeer } = useTelegram();
   const isSavedMessages = !activePeer || activePeer === 'me';
 
   if (files.length === 0) {
+    if (activeTab === 'favorites') {
+      return (
+        <div className="flex flex-col items-center justify-center py-16 sm:py-24 px-4 text-center bg-white/50 dark:bg-[#18191d]/50 rounded-3xl border border-dashed border-slate-200 dark:border-zinc-800">
+          <div className="w-16 h-16 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-500 flex items-center justify-center mb-4">
+            <Star className="w-8 h-8 fill-amber-500/20" />
+          </div>
+          <h3 className="text-sm sm:text-base font-bold text-slate-800 dark:text-zinc-200 mb-1">
+            {t('noFavoritesFound')}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md">
+            {t('noFavoritesDesc')}
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col items-center justify-center py-16 sm:py-24 px-4 text-center bg-white/50 dark:bg-[#18191d]/50 rounded-3xl border border-dashed border-slate-200 dark:border-zinc-800">
         <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-500 flex items-center justify-center mb-4">
@@ -38,7 +54,7 @@ export function FileGrid({ files }: { files: TelegramFile[] }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-4.5">
       {files.map((file) => (
-        <FileCard key={file.id} file={file} />
+        <FileCard key={`${file.originPeer || 'me'}_${file.id}`} file={file} />
       ))}
     </div>
   );

@@ -16,6 +16,7 @@ import {
   X,
   CheckCircle2,
   ExternalLink,
+  Star,
 } from 'lucide-react';
 import { TelegramFile } from '../types';
 import { formatFileSize, formatDate, formatDuration, getFileExtension, getFileColor } from '../utils/formatters';
@@ -24,6 +25,7 @@ import { useTheme } from '../context/ThemeContext';
 
 export function FileCard({ file }: { file: TelegramFile }) {
   const {
+    activeTab,
     setActiveVideo,
     setActiveAudio,
     setIsPlayingAudio,
@@ -35,6 +37,8 @@ export function FileCard({ file }: { file: TelegramFile }) {
     isSelectionMode,
     toggleSelectFile,
     activePeer,
+    toggleFavorite,
+    isFavorite,
   } = useTelegram();
   const { t, lang } = useTheme();
   const isSavedMessages = !activePeer || activePeer === 'me';
@@ -174,6 +178,8 @@ export function FileCard({ file }: { file: TelegramFile }) {
     }
   };
 
+  const isFav = isFavorite(file);
+
   return (
     <>
       <div
@@ -238,18 +244,38 @@ export function FileCard({ file }: { file: TelegramFile }) {
             </span>
           )}
 
-          {/* Mobile 3-Dot Action Trigger */}
+          {/* Top Actions: Star / Bookmark & Mobile 3-Dot */}
           {!isSelectionMode && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowMobileActions(true);
-              }}
-              aria-label="Actions"
-              className="sm:hidden absolute top-1.5 end-1.5 w-7 h-7 rounded-full bg-black/55 backdrop-blur-md text-white flex items-center justify-center active:scale-90"
-            >
-              <MoreVertical className="w-3.5 h-3.5" />
-            </button>
+            <div className="absolute top-2 end-2 z-20 flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFavorite(file);
+                  if (navigator.vibrate) navigator.vibrate(20);
+                }}
+                title={isFav ? t('removeFromFavorites') : t('addToFavorites')}
+                aria-label="Toggle favorite"
+                className={`w-6.5 h-6.5 rounded-lg flex items-center justify-center transition-all duration-150 cursor-pointer ${
+                  isFav
+                    ? 'bg-amber-400 text-slate-950 shadow-md scale-105 opacity-100 ring-1 ring-amber-300/50'
+                    : 'bg-black/50 backdrop-blur-md text-white/90 sm:opacity-0 sm:group-hover:opacity-100 hover:scale-110 hover:text-amber-300'
+                }`}
+              >
+                <Star className={`w-3.5 h-3.5 ${isFav ? 'fill-slate-950 stroke-slate-950' : 'fill-none stroke-current'}`} />
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMobileActions(true);
+                }}
+                aria-label="Actions"
+                className="sm:hidden w-6.5 h-6.5 rounded-lg bg-black/50 backdrop-blur-md text-white flex items-center justify-center active:scale-90"
+              >
+                <MoreVertical className="w-3.5 h-3.5" />
+              </button>
+            </div>
           )}
 
           {/* Desktop Hover Floating Glass Actions Overlay */}
@@ -268,6 +294,22 @@ export function FileCard({ file }: { file: TelegramFile }) {
                 ) : (
                   <Eye className="w-4 h-4 text-blue-600" />
                 )}
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFavorite(file);
+                  if (navigator.vibrate) navigator.vibrate(20);
+                }}
+                title={isFav ? t('removeFromFavorites') : t('addToFavorites')}
+                className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-lg transition active:scale-95 cursor-pointer ${
+                  isFav
+                    ? 'bg-amber-400 text-slate-950 hover:bg-amber-300 hover:scale-110'
+                    : 'bg-white/95 text-slate-900 hover:bg-white hover:scale-110'
+                }`}
+              >
+                <Star className={`w-4 h-4 ${isFav ? 'fill-slate-950 stroke-slate-950' : 'text-amber-500'}`} />
               </button>
 
               <button
@@ -314,10 +356,17 @@ export function FileCard({ file }: { file: TelegramFile }) {
 
             {/* Zero-Pill Clean Unboxed Metadata */}
             <div className="flex items-center gap-1.5 text-[11px] text-slate-400 dark:text-zinc-500 mt-1 font-medium">
-              <span className="font-mono tabular-nums">{formatFileSize(file.size)}</span>
+              <span className="font-mono tabular-nums dir-ltr inline-block" dir="ltr">{formatFileSize(file.size)}</span>
               <span aria-hidden="true" className="text-slate-300 dark:text-zinc-700">·</span>
               <span className="truncate">{formatDate(file.date, lang).split(',')[0]}</span>
             </div>
+
+            {Boolean(file.originChatTitle && activeTab === 'favorites') && (
+              <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium truncate">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                <span className="truncate">{file.originChatTitle}</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -370,6 +419,17 @@ export function FileCard({ file }: { file: TelegramFile }) {
           >
             <Share2 className="w-3.5 h-3.5" />
             <span>{t('shareFile')}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setContextMenuPos(null);
+              toggleFavorite(file);
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-700 dark:text-zinc-200 hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-600 dark:hover:text-amber-400 transition cursor-pointer"
+          >
+            <Star className={`w-3.5 h-3.5 ${isFav ? 'fill-amber-500 text-amber-500' : 'text-amber-500'}`} />
+            <span>{isFav ? t('removeFromFavorites') : t('addToFavorites')}</span>
           </button>
 
           <div className="h-[1px] bg-slate-100 dark:bg-zinc-800 my-1" />
@@ -468,6 +528,21 @@ export function FileCard({ file }: { file: TelegramFile }) {
               >
                 <Share2 className="w-4 h-4" />
                 <span>{t('shareFile')}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  toggleFavorite(file);
+                  setTimeout(() => setShowMobileActions(false), 250);
+                }}
+                className={`col-span-2 flex items-center justify-center gap-2.5 p-3 rounded-2xl transition ${
+                  isFav
+                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-bold'
+                    : 'bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 font-semibold'
+                }`}
+              >
+                <Star className={`w-4 h-4 ${isFav ? 'fill-amber-500 text-amber-500' : 'text-amber-500'}`} />
+                <span>{isFav ? t('removeFromFavorites') : t('addToFavorites')}</span>
               </button>
 
               <button

@@ -10,7 +10,7 @@ interface ChatSelectorModalProps {
 
 export const ChatSelectorModal: React.FC<ChatSelectorModalProps> = ({ onClose }) => {
   const { t, lang } = useTheme();
-  const { activePeer, setActivePeer, refreshFiles, isDemoMode } = useTelegram();
+  const { activePeer, setActivePeer, setActiveTab, isDemoMode } = useTelegram();
 
   const [chats, setChats] = useState<TelegramChat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,8 +48,8 @@ export const ChatSelectorModal: React.FC<ChatSelectorModalProps> = ({ onClose })
   }, [isDemoMode, lang]);
 
   const handleSelectChat = (chat: TelegramChat) => {
+    setActiveTab('files');
     setActivePeer(chat.id, chat.title);
-    refreshFiles();
     onClose();
   };
 
