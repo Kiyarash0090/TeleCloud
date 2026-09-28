@@ -73,10 +73,10 @@ export function MultiSelectBar() {
 
   return (
     <div
-      className={`fixed inset-x-2.5 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-40 transition-all duration-200 animate-in slide-in-from-bottom-4 fade-in ${
+      className={`fixed inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-40 transition-all duration-200 animate-in slide-in-from-bottom-4 fade-in ${
         activeAudio
-          ? 'bottom-[8.75rem] md:bottom-24'
-          : 'bottom-[4.5rem] md:bottom-6'
+          ? 'bottom-[9.75rem] md:bottom-28'
+          : 'bottom-[5.25rem] md:bottom-6'
       }`}
     >
       <div className="bg-slate-900/95 dark:bg-zinc-900/95 backdrop-blur-xl text-white border border-white/15 rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 shadow-2xl flex items-center justify-between gap-2 sm:gap-4 max-w-xl mx-auto">

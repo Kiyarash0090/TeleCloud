@@ -22,7 +22,6 @@ export function MobileBottomNav() {
     activePeer,
     user,
     isConnected,
-    isDemoMode,
     favoriteFileIds,
   } = useTelegram();
   const { t, lang } = useTheme();
@@ -77,7 +76,7 @@ export function MobileBottomNav() {
       {/* 1. All Files / Drive Home */}
       <button
         onClick={handleGoFiles}
-        className={`flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl transition-all active:scale-95 cursor-pointer min-h-[42px] ${
+        className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all active:scale-95 cursor-pointer min-h-[42px] ${
           activeTab === 'files'
             ? 'text-blue-600 dark:text-sky-400 font-bold bg-blue-50/80 dark:bg-sky-500/15'
             : 'text-slate-500 dark:text-zinc-400 font-medium hover:text-slate-700 dark:hover:text-zinc-200'

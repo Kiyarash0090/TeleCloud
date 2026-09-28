@@ -25,12 +25,32 @@ const ACTIVE_ACCOUNT_ID_KEY = 'telecloud_active_account_id';
 const SHARED_API_CREDS_KEY = 'telecloud_shared_api_creds';
 const LEGACY_TOKEN_KEY = 'telecloud_encrypted_session';
 
+function buildProfilePhotoUrl(uid: string, encryptedToken?: string): string {
+  const base = `/api/telegram/profile-photo?uid=${encodeURIComponent(uid)}`;
+  if (encryptedToken) {
+    return `${base}&token=${encodeURIComponent(encryptedToken)}`;
+  }
+  return base;
+}
+
 function loadSavedAccounts(): SavedTelegramAccount[] {
   try {
     const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((acc: SavedTelegramAccount) => {
+      const uid = String(acc.id || acc.user?.id || '');
+      return {
+        ...acc,
+        id: uid,
+        user: {
+          ...acc.user,
+          id: uid,
+          photoUrl: buildProfilePhotoUrl(uid, acc.encryptedToken),
+        },
+      };
+    });
   } catch {
     return [];
   }
@@ -534,19 +554,19 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         saveSharedApiCreds(apiId, apiHash);
       }
       const uid = String(userData.id);
-      const enrichedUser: TelegramUser = {
-        ...userData,
-        id: uid,
-        photoUrl: userData.photoUrl || `/api/telegram/profile-photo?uid=${encodeURIComponent(uid)}`,
-      };
-
       let nextList: SavedTelegramAccount[] = [];
       setAccounts((prev) => {
         const existing = prev.find((a) => a.id === uid);
+        const effectiveToken = encryptedToken || existing?.encryptedToken || '';
+        const enrichedUser: TelegramUser = {
+          ...userData,
+          id: uid,
+          photoUrl: buildProfilePhotoUrl(uid, effectiveToken),
+        };
         const entry: SavedTelegramAccount = {
           id: uid,
           user: existing ? { ...existing.user, ...enrichedUser } : enrichedUser,
-          encryptedToken: encryptedToken || existing?.encryptedToken || '',
+          encryptedToken: effectiveToken,
           apiId: apiId || existing?.apiId,
           addedAt: existing?.addedAt || Date.now(),
           lastActiveAt: Date.now(),

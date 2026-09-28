@@ -107,18 +107,6 @@ export function AccountPage() {
         </button>
 
         <div className="flex items-center gap-2">
-          {isConnected && (
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-200 text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-              title={t('refreshProfile')}
-            >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
-              <span className="hidden sm:inline">{t('refreshProfile')}</span>
-            </button>
-          )}
-
           {(isConnected || isDemoMode) ? (
             <>
               <button

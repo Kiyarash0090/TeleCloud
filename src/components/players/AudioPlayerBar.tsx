@@ -554,8 +554,18 @@ export function AudioPlayerBar() {
     setShowPlaylist(false);
   };
 
+  const displayFilename = (() => {
+    try {
+      return activeAudio.filename.includes('%')
+        ? decodeURIComponent(activeAudio.filename)
+        : activeAudio.filename;
+    } catch {
+      return activeAudio.filename;
+    }
+  })();
+
   return (
-    <div className="fixed bottom-[74px] md:bottom-5 inset-x-0 md:max-w-4xl md:mx-auto z-40 px-2.5 sm:px-4 animate-in slide-in-from-bottom-4 duration-300 select-none">
+    <div className="fixed bottom-[88px] sm:bottom-[92px] md:bottom-6 inset-x-3 sm:inset-x-4 max-w-md sm:max-w-2xl md:max-w-4xl mx-auto z-40 animate-in slide-in-from-bottom-4 duration-300 select-none">
       <audio
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
@@ -569,7 +579,7 @@ export function AudioPlayerBar() {
 
       {/* Playlist Queue Dropup Panel (Glassmorphic) */}
       {showPlaylist && (
-        <div className="mb-2 bg-white/75 dark:bg-[#121316]/75 backdrop-blur-2xl backdrop-saturate-150 rounded-2xl sm:rounded-3xl shadow-[0_12px_40px_rgba(0,0,0,0.2)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.6)] border border-white/60 dark:border-white/15 p-3 max-h-60 sm:max-h-72 overflow-y-auto flex flex-col gap-1 text-xs animate-in fade-in slide-in-from-bottom-2 duration-200 ring-1 ring-black/5 dark:ring-white/5">
+        <div className="mb-2.5 bg-white/85 dark:bg-[#121316]/85 backdrop-blur-2xl backdrop-saturate-150 rounded-2xl sm:rounded-3xl shadow-[0_12px_40px_rgba(0,0,0,0.2)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.6)] border border-white/60 dark:border-white/15 p-3 max-h-60 sm:max-h-72 overflow-y-auto flex flex-col gap-1 text-xs animate-in fade-in slide-in-from-bottom-2 duration-200 ring-1 ring-black/5 dark:ring-white/5">
           <div className="flex items-center justify-between px-2 pb-2 border-b border-slate-200/60 dark:border-white/10 text-slate-700 dark:text-zinc-200 font-bold">
             <span className="flex items-center gap-2">
               <ListMusic className="w-4 h-4 text-emerald-500" />
@@ -589,10 +599,16 @@ export function AudioPlayerBar() {
 
           <div className="flex flex-col gap-1 mt-1">
             {audioFiles.map((file, idx) => {
-              const isCurrent = file.id === activeAudio.id;
+              const isCurrent =
+                file.id === activeAudio.id &&
+                (file.originPeer || 'me') === (activeAudio.originPeer || 'me');
+              let cleanItemName = file.filename;
+              try {
+                if (cleanItemName.includes('%')) cleanItemName = decodeURIComponent(cleanItemName);
+              } catch {}
               return (
                 <button
-                  key={file.id}
+                  key={`${file.originPeer || 'me'}_${file.id}`}
                   onClick={() => {
                     setActiveAudio(file);
                     setShowPlaylist(false);
@@ -609,7 +625,7 @@ export function AudioPlayerBar() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold" dir="auto">
-                        {file.filename}
+                        {cleanItemName}
                       </p>
                       <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-mono mt-0.5">
                         {formatFileSize(file.size)}
@@ -666,7 +682,7 @@ export function AudioPlayerBar() {
           </div>
 
           {/* Interactive Full-Width Scrub Bar */}
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1" dir="ltr">
             <div
               ref={expandedProgressBarRef}
               onMouseDown={(e) => handleScrubMouseDown(e, expandedProgressBarRef.current)}
@@ -705,7 +721,7 @@ export function AudioPlayerBar() {
           </div>
 
           {/* Full Transport Controls Row */}
-          <div className="flex items-center justify-between px-2">
+          <div className="flex items-center justify-between px-2" dir="ltr">
             <button
               onClick={() => setIsShuffle(!isShuffle)}
               className={`p-2.5 rounded-xl transition active:scale-90 ${
@@ -812,7 +828,7 @@ export function AudioPlayerBar() {
 
             <a
               href={activeAudio.downloadUrl}
-              download={activeAudio.filename}
+              download={displayFilename}
               className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 active:scale-95 transition"
             >
               <Download className="w-3.5 h-3.5" />
@@ -823,9 +839,10 @@ export function AudioPlayerBar() {
       )}
 
       {/* Main Floating Dock Bar (Glassmorphic) */}
-      <div className="bg-white/75 dark:bg-[#121316]/75 backdrop-blur-2xl backdrop-saturate-150 rounded-2xl sm:rounded-3xl shadow-[0_12px_40px_rgba(0,0,0,0.18)] dark:shadow-[0_16px_50px_rgba(0,0,0,0.65)] border border-white/65 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/5 overflow-visible relative transition-all">
+      <div className="bg-white/85 dark:bg-[#141519]/90 backdrop-blur-2xl backdrop-saturate-150 rounded-2xl sm:rounded-3xl shadow-[0_14px_38px_rgba(0,0,0,0.2)] dark:shadow-[0_16px_44px_rgba(0,0,0,0.7)] border border-white/70 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/5 overflow-visible relative transition-all">
         {/* Top Interactive Scrub Bar */}
         <div
+          dir="ltr"
           ref={progressBarRef}
           onMouseDown={(e) => handleScrubMouseDown(e, progressBarRef.current)}
           onMouseMove={handleProgressMouseMove}
@@ -833,7 +850,7 @@ export function AudioPlayerBar() {
           onTouchStart={(e) => handleScrubTouchStart(e, progressBarRef.current)}
           onTouchMove={(e) => handleScrubTouchMove(e, progressBarRef.current)}
           onTouchEnd={handleScrubTouchEnd}
-          className="relative w-full h-3.5 flex items-center cursor-pointer group/bar px-3 sm:px-5 pt-1 touch-none"
+          className="relative w-full h-3.5 flex items-center cursor-pointer group/bar px-3.5 sm:px-5 pt-1 touch-none"
         >
           <div className="w-full h-1 group-hover/bar:h-1.5 bg-slate-200/80 dark:bg-zinc-800/80 rounded-full overflow-hidden transition-all relative">
             <div
@@ -879,17 +896,17 @@ export function AudioPlayerBar() {
             className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 cursor-pointer md:cursor-default transition-transform duration-150"
           >
             {/* Album Cover or Rotating Studio Icon */}
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-emerald-500/15 via-teal-500/15 to-cyan-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/25 relative overflow-hidden">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-emerald-500/15 via-teal-500/15 to-cyan-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/25 relative overflow-hidden">
               {activeAudio.thumbnailUrl ? (
                 <img
                   src={activeAudio.thumbnailUrl}
-                  alt={activeAudio.filename}
+                  alt={displayFilename}
                   className="w-full h-full object-cover"
                 />
               ) : isPlayingAudio && !hasError ? (
                 <Disc3 className="w-5 h-5 sm:w-6 sm:h-6 animate-[spin_4s_linear_infinite]" />
               ) : (
-                <Music className="w-5 h-5" />
+                <Music className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
               )}
 
               {/* Subtle Live Equalizer Overlay */}
@@ -907,12 +924,12 @@ export function AudioPlayerBar() {
               <h4
                 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-zinc-100 truncate"
                 dir="auto"
-                title={activeAudio.filename}
+                title={displayFilename}
               >
-                {activeAudio.filename}
+                {displayFilename}
               </h4>
 
-              <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-500 dark:text-zinc-400 font-mono truncate mt-0.5">
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-500 dark:text-zinc-400 font-mono truncate mt-0.5" dir="ltr">
                 <button
                   type="button"
                   onClick={(e) => {
@@ -921,13 +938,17 @@ export function AudioPlayerBar() {
                   }}
                   className="hover:text-emerald-600 dark:hover:text-emerald-400 transition"
                 >
-                  {formatDuration(currentTime)} /{' '}
-                  {showRemainingTime && effectiveDuration > 0
-                    ? `-${formatDuration(Math.max(0, effectiveDuration - currentTime))}`
-                    : formatDuration(effectiveDuration)}
+                  {formatDuration(currentTime)}
+                  {effectiveDuration > 0
+                    ? ` / ${
+                        showRemainingTime
+                          ? `-${formatDuration(Math.max(0, effectiveDuration - currentTime))}`
+                          : formatDuration(effectiveDuration)
+                      }`
+                    : ''}
                 </button>
-                <span aria-hidden="true">·</span>
-                <span>{formatFileSize(activeAudio.size)}</span>
+                <span className="hidden xs:inline" aria-hidden="true">·</span>
+                <span className="hidden xs:inline">{formatFileSize(activeAudio.size)}</span>
                 {ext && (
                   <>
                     <span className="hidden sm:inline" aria-hidden="true">
@@ -940,8 +961,8 @@ export function AudioPlayerBar() {
             </div>
           </div>
 
-          {/* Center Zone: Transport Controls */}
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {/* Center Zone: Transport Controls (Always LTR so Prev/Play/Next arrows match direction) */}
+          <div className="flex items-center gap-0.5 sm:gap-1.5 shrink-0" dir="ltr">
             {/* Shuffle (Desktop) */}
             <button
               onClick={() => setIsShuffle(!isShuffle)}
@@ -965,10 +986,10 @@ export function AudioPlayerBar() {
               <SkipBack className="w-4 h-4 fill-current" />
             </button>
 
-            {/* -10s */}
+            {/* -10s (Hidden on compact mobile bar, available in expanded view & desktop) */}
             <button
               onClick={() => skipTime(-10)}
-              className="flex p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-zinc-300 dark:hover:text-white transition active:scale-90 cursor-pointer"
+              className="hidden sm:flex p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-zinc-300 dark:hover:text-white transition active:scale-90 cursor-pointer"
               title="-10s"
             >
               <RotateCcw className="w-4 h-4" />
@@ -979,7 +1000,7 @@ export function AudioPlayerBar() {
               onClick={togglePlay}
               disabled={hasError}
               aria-label={isPlayingAudio ? 'Pause' : 'Play'}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-md shadow-emerald-500/25 flex items-center justify-center active:scale-90 transition hover:brightness-105 disabled:opacity-50 shrink-0 cursor-pointer"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-md shadow-emerald-500/25 flex items-center justify-center active:scale-90 transition hover:brightness-105 disabled:opacity-50 shrink-0 cursor-pointer mx-0.5"
             >
               {isPlayingAudio ? (
                 <Pause className="w-4 h-4 fill-current" />
@@ -988,10 +1009,10 @@ export function AudioPlayerBar() {
               )}
             </button>
 
-            {/* +10s */}
+            {/* +10s (Hidden on compact mobile bar, available in expanded view & desktop) */}
             <button
               onClick={() => skipTime(10)}
-              className="flex p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-zinc-300 dark:hover:text-white transition active:scale-90 cursor-pointer"
+              className="hidden sm:flex p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-zinc-300 dark:hover:text-white transition active:scale-90 cursor-pointer"
               title="+10s"
             >
               <RotateCw className="w-4 h-4" />

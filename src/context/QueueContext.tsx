@@ -6,6 +6,7 @@ interface QueueContextType {
   addFilesToQueue: (files: FileList | File[]) => void;
   cancelUpload: (id: string) => void;
   retryUpload: (id: string) => void;
+  removeTask: (id: string) => void;
   clearCompleted: () => void;
   isUploading: boolean;
   isOpen: boolean;
@@ -55,21 +56,36 @@ export function QueueProvider({
       activeXhrs.current.delete(id);
     }
     setQueue(prev =>
-      prev.map(item => (item.id === id ? { ...item, status: 'cancelled', speed: '' } : item))
+      prev.map(item =>
+        item.id === id
+          ? { ...item, status: 'cancelled', speed: '', completedAt: Date.now() }
+          : item
+      )
     );
   };
 
   const retryUpload = (id: string) => {
     setQueue(prev =>
       prev.map(item =>
-        item.id === id ? { ...item, status: 'queued', progress: 0, error: undefined } : item
+        item.id === id
+          ? { ...item, status: 'queued', progress: 0, error: undefined, completedAt: undefined }
+          : item
       )
     );
   };
 
-  const clearCompleted = () => {
+  const removeTask = useCallback((id: string) => {
+    const xhr = activeXhrs.current.get(id);
+    if (xhr) {
+      xhr.abort();
+      activeXhrs.current.delete(id);
+    }
+    setQueue(prev => prev.filter(item => item.id !== id));
+  }, []);
+
+  const clearCompleted = useCallback(() => {
     setQueue(prev => prev.filter(item => item.status === 'uploading' || item.status === 'queued'));
-  };
+  }, []);
 
   const processNextInQueue = useCallback(async () => {
     if (isProcessingRef.current) return;
@@ -83,7 +99,7 @@ export function QueueProvider({
     setQueue(prev =>
       prev.map(item =>
         item.id === queuedItem.id
-          ? { ...item, status: 'uploading', startedAt: Date.now() }
+          ? { ...item, status: 'uploading', startedAt: Date.now(), completedAt: undefined }
           : item
       )
     );
@@ -148,6 +164,7 @@ export function QueueProvider({
                     progress: 100,
                     speed: '',
                     messageId: res.messageId,
+                    completedAt: Date.now(),
                   }
                 : item
             )
@@ -157,7 +174,13 @@ export function QueueProvider({
           setQueue(prev =>
             prev.map(item =>
               item.id === queuedItem.id
-                ? { ...item, status: 'completed', progress: 100, speed: '' }
+                ? {
+                    ...item,
+                    status: 'completed',
+                    progress: 100,
+                    speed: '',
+                    completedAt: Date.now(),
+                  }
                 : item
             )
           );
@@ -171,7 +194,13 @@ export function QueueProvider({
         setQueue(prev =>
           prev.map(item =>
             item.id === queuedItem.id
-              ? { ...item, status: 'failed', error: errMsg, speed: '' }
+              ? {
+                  ...item,
+                  status: 'failed',
+                  error: errMsg,
+                  speed: '',
+                  completedAt: Date.now(),
+                }
               : item
           )
         );
@@ -184,7 +213,13 @@ export function QueueProvider({
       setQueue(prev =>
         prev.map(item =>
           item.id === queuedItem.id
-            ? { ...item, status: 'failed', error: 'Network error occurred', speed: '' }
+            ? {
+                ...item,
+                status: 'failed',
+                error: 'Network error occurred',
+                speed: '',
+                completedAt: Date.now(),
+              }
             : item
         )
       );
@@ -221,6 +256,7 @@ export function QueueProvider({
         addFilesToQueue,
         cancelUpload,
         retryUpload,
+        removeTask,
         clearCompleted,
         isUploading,
         isOpen,

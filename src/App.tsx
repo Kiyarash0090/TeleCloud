@@ -20,6 +20,7 @@ import { MultiSelectBar } from './components/MultiSelectBar';
 import { WebAppAuthModal } from './components/WebAppAuthModal';
 import { AccountPage } from './components/AccountPage';
 import { ChatSelectorModal } from './components/ChatSelectorModal';
+import { ChatQuickSwitcher } from './components/ChatQuickSwitcher';
 import { TelegramLinkModal } from './components/TelegramLinkModal';
 import { AccountSwitcherDrawer } from './components/AccountSwitcherDrawer';
 import { RotateCw, UploadCloud, LogOut } from 'lucide-react';
@@ -58,6 +59,8 @@ function TeleCloudApp() {
     hasMoreFiles,
     isLoadingMore,
     loadMoreFiles,
+    refreshFiles,
+    fetchFullUser,
   } = useTelegram();
 
   const { addFilesToQueue } = useQueue();
@@ -66,6 +69,80 @@ function TeleCloudApp() {
   const [isWorkspaceDragging, setIsWorkspaceDragging] = useState(false);
   const dragCounterRef = useRef(0);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+  const mainScrollRef = useRef<HTMLElement>(null);
+  const pullStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isPullLockedHorizontalRef = useRef(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+
+  const handleMainTouchStart = (e: React.TouchEvent<HTMLElement>) => {
+    const el = mainScrollRef.current;
+    if (!el || el.scrollTop > 2 || isPullRefreshing || isLoading) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    pullStartRef.current = { x: touch.clientX, y: touch.clientY };
+    isPullLockedHorizontalRef.current = false;
+  };
+
+  const handleMainTouchMove = (e: React.TouchEvent<HTMLElement>) => {
+    const start = pullStartRef.current;
+    const el = mainScrollRef.current;
+    if (!start || !el || isPullRefreshing) return;
+
+    if (el.scrollTop > 2) {
+      pullStartRef.current = null;
+      setPullDistance(0);
+      return;
+    }
+
+    const touch = e.touches[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+
+    if (!isPullLockedHorizontalRef.current && Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+      isPullLockedHorizontalRef.current = true;
+      pullStartRef.current = null;
+      setPullDistance(0);
+      return;
+    }
+
+    if (isPullLockedHorizontalRef.current) return;
+
+    if (deltaY > 6) {
+      const damped = Math.min(96, (deltaY - 6) * 0.45);
+      setPullDistance(damped);
+    } else {
+      setPullDistance(0);
+    }
+  };
+
+  const handleMainTouchEnd = async () => {
+    if (!pullStartRef.current) return;
+    pullStartRef.current = null;
+
+    if (pullDistance >= 54 && !isPullRefreshing) {
+      setIsPullRefreshing(true);
+      setPullDistance(52);
+      if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+        try {
+          window.navigator.vibrate(25);
+        } catch {}
+      }
+      window.dispatchEvent(new CustomEvent('telecloud-pull-refresh'));
+      try {
+        await Promise.all([
+          refreshFiles(true),
+          fetchFullUser(),
+        ]);
+      } finally {
+        setIsPullRefreshing(false);
+        setPullDistance(0);
+      }
+    } else {
+      setPullDistance(0);
+    }
+  };
 
   useEffect(() => {
     const sentinel = loadMoreSentinelRef.current;
@@ -163,16 +240,45 @@ function TeleCloudApp() {
           </div>
         )}
 
-        {/* Main Workspace Area with Drag and Drop Handlers */}
+        {/* Main Workspace Area with Drag and Drop & Pull-to-Refresh Handlers */}
         <main
+          ref={mainScrollRef}
+          onTouchStart={handleMainTouchStart}
+          onTouchMove={handleMainTouchMove}
+          onTouchEnd={handleMainTouchEnd}
+          onTouchCancel={handleMainTouchEnd}
           onDragEnter={handleWorkspaceDragEnter}
           onDragOver={handleWorkspaceDragOver}
           onDragLeave={handleWorkspaceDragLeave}
           onDrop={handleWorkspaceDrop}
-          className={`flex-1 p-2.5 sm:p-5 md:p-7 overflow-y-auto overflow-x-hidden relative ${
-            activeAudio ? 'pb-40 md:pb-28' : 'pb-24 md:pb-14'
+          className={`flex-1 p-2.5 sm:p-5 md:p-7 overflow-y-auto overflow-x-hidden overscroll-y-contain relative ${
+            activeAudio ? 'pb-44 md:pb-32' : 'pb-24 md:pb-14'
           }`}
         >
+          {/* Standard Native-Style Pull-to-Refresh Indicator (No extra text) */}
+          {(pullDistance > 0 || isPullRefreshing) && (
+            <div
+              className="flex items-center justify-center overflow-hidden transition-all duration-150 pointer-events-none"
+              style={{ height: isPullRefreshing ? 48 : pullDistance }}
+            >
+              <div
+                className={`w-9 h-9 rounded-full bg-white dark:bg-zinc-800 border border-slate-200/90 dark:border-zinc-700 shadow-md flex items-center justify-center transition-transform ${
+                  pullDistance >= 54 || isPullRefreshing ? 'scale-100' : 'scale-90 opacity-85'
+                }`}
+              >
+                <RotateCw
+                  className={`w-4.5 h-4.5 text-blue-600 dark:text-sky-400 ${
+                    isPullRefreshing ? 'animate-spin' : ''
+                  }`}
+                  style={
+                    !isPullRefreshing
+                      ? { transform: `rotate(${Math.round(pullDistance * 4.2)}deg)` }
+                      : undefined
+                  }
+                />
+              </div>
+            </div>
+          )}
           {/* Full Workspace Drag & Drop Active Overlay (Only in Saved Messages) */}
           {isSavedMessages && isWorkspaceDragging && (
             <div className="absolute inset-2 z-50 bg-blue-600/10 dark:bg-blue-500/15 backdrop-blur-md border-4 border-dashed border-blue-500 dark:border-blue-400 rounded-3xl flex flex-col items-center justify-center text-center p-8 transition-all animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
@@ -194,7 +300,8 @@ function TeleCloudApp() {
             <AccountPage />
           ) : (
             <>
-
+              {/* Quick Channels & Chats Switcher Bar (Main Page & Mobile) */}
+              {activeTab === 'files' && <ChatQuickSwitcher />}
 
               {/* Category & Format Filters */}
               <QuickFilters />

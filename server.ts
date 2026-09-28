@@ -837,46 +837,80 @@ app.get('/api/telegram/full-user', async (req: Request, res: Response) => {
   }
 });
 
-// Download / Stream User Profile Photo from Telegram (supports ?uid=... for multi-account avatars)
+// Download / Stream User Profile Photo from Telegram (supports ?uid=...&token=... for multi-account avatars)
 app.get('/api/telegram/profile-photo', async (req: Request, res: Response) => {
   const sessionId = getSessionId(req);
   const session = activeSessions.get(sessionId);
   const requestedUid = typeof req.query.uid === 'string' ? req.query.uid.trim() : (session?.user?.id || '');
+  const tokenParam = typeof req.query.token === 'string' ? req.query.token.trim() : '';
 
   // Check in-memory profile photo cache first
-  if (requestedUid) {
+  if (requestedUid && requestedUid !== 'me') {
     const cachedPhoto = profilePhotoCache.get(requestedUid);
     if (cachedPhoto && Date.now() - cachedPhoto.cachedAt < 3600000) {
       res.setHeader('Content-Type', 'image/jpeg');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Cache-Control', 'private, max-age=3600');
       return res.send(cachedPhoto.buffer);
     }
   }
 
-  const targetClient = (requestedUid && userClientMap.get(requestedUid)) || session?.client;
+  let targetClient: TelegramClient | undefined = undefined;
+
+  if (requestedUid && requestedUid !== 'me' && userClientMap.has(requestedUid)) {
+    targetClient = userClientMap.get(requestedUid);
+  } else if (
+    session?.client &&
+    (!requestedUid || requestedUid === 'me' || session.user?.id === requestedUid)
+  ) {
+    targetClient = session.client;
+  } else if (tokenParam) {
+    const payload = decryptSession(tokenParam);
+    if (payload && payload.apiId && payload.apiHash && payload.sessionString) {
+      try {
+        let pooled = clientPool.get(payload.sessionString);
+        if (!pooled) {
+          const strSession = new StringSession(payload.sessionString);
+          pooled = new TelegramClient(strSession, payload.apiId, payload.apiHash, {
+            connectionRetries: 3,
+          });
+          await pooled.connect();
+          clientPool.set(payload.sessionString, pooled);
+        } else if (!pooled.connected) {
+          await pooled.connect();
+        }
+        if (requestedUid && requestedUid !== 'me') {
+          userClientMap.set(requestedUid, pooled);
+        }
+        targetClient = pooled;
+      } catch {}
+    }
+  }
 
   if (!targetClient) {
     return res.status(404).send('Not connected');
   }
 
   try {
+    if (!targetClient.connected) {
+      await targetClient.connect();
+    }
     const isAuthorized = await targetClient.isUserAuthorized();
     if (!isAuthorized) {
       return res.status(401).send('Unauthorized');
     }
 
-    // Download profile photo using GramJS
+    // Download profile photo for this specific account's 'me'
     const buffer = (await targetClient.downloadProfilePhoto('me', {
       isBig: true,
     })) as Buffer | null;
 
     if (buffer && buffer.length > 0) {
       const nodeBuf = Buffer.from(buffer);
-      if (requestedUid) {
+      if (requestedUid && requestedUid !== 'me') {
         profilePhotoCache.set(requestedUid, { buffer: nodeBuf, cachedAt: Date.now() });
       }
       res.setHeader('Content-Type', 'image/jpeg');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Cache-Control', 'private, max-age=3600');
       return res.send(nodeBuf);
     } else {
       return res.status(404).send('No profile photo');
@@ -934,18 +968,51 @@ app.post('/api/telegram/logout', async (req: Request, res: Response) => {
   return res.json({ success: true, message: 'Disconnected from Telegram' });
 });
 
-// Helper to parse target peer (Saved Messages 'me', channel/group/user id or username)
-function getTargetPeer(peerParam: any): any {
-  if (!peerParam || peerParam === 'me' || peerParam === 'self') return 'me';
-  if (typeof peerParam === 'string' && peerParam.startsWith('@')) return peerParam;
-  const num = Number(peerParam);
-  if (!isNaN(num)) {
-    return bigInt(num);
+// Per-user entity cache so private channels, private groups, and PVs without usernames resolve with accessHash
+const userPeerEntityCache = new Map<string, Map<string, any>>();
+const userDialogsCache = new Map<string, { chats: any[]; cachedAt: number }>();
+
+function cachePeerEntityForUser(uid: string, keys: string[], targetEntity: any) {
+  if (!uid || !targetEntity) return;
+  let map = userPeerEntityCache.get(uid);
+  if (!map) {
+    map = new Map<string, any>();
+    userPeerEntityCache.set(uid, map);
   }
-  return peerParam;
+  for (const k of keys) {
+    if (k) {
+      map.set(String(k), targetEntity);
+      map.set(String(k).toLowerCase(), targetEntity);
+    }
+  }
 }
 
-// Get all user chats, channels, groups, and bots
+// Helper to parse target peer (Saved Messages 'me', channel/group/user id or username)
+function getTargetPeer(peerParam: any, currentUid?: string): any {
+  if (!peerParam || peerParam === 'me' || peerParam === 'self') return 'me';
+  const peerStr = String(peerParam).trim();
+  if (!peerStr || peerStr === 'me' || peerStr === 'self') return 'me';
+
+  // 1. Check cached inputEntity / entity for this user (essential for private groups/channels & PVs)
+  if (currentUid && userPeerEntityCache.has(currentUid)) {
+    const map = userPeerEntityCache.get(currentUid)!;
+    const cached = map.get(peerStr) || map.get(peerStr.toLowerCase());
+    if (cached) return cached;
+  }
+  // Also check across any active user maps as fallback
+  for (const map of userPeerEntityCache.values()) {
+    const cached = map.get(peerStr) || map.get(peerStr.toLowerCase());
+    if (cached) return cached;
+  }
+
+  if (peerStr.startsWith('@')) return peerStr;
+  if (/^-?\d+$/.test(peerStr)) {
+    return bigInt(peerStr);
+  }
+  return peerStr;
+}
+
+// Get all user chats, channels, groups, PVs, and bots (including private channels/groups without username)
 app.get('/api/telegram/chats', async (req: Request, res: Response) => {
   try {
     const sessionId = getSessionId(req);
@@ -955,7 +1022,27 @@ app.get('/api/telegram/chats', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Not connected to Telegram' });
     }
 
-    const dialogs = await client.getDialogs({ limit: 80 });
+    const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
+    const forceRefresh = req.query.refresh === '1';
+
+    if (!forceRefresh) {
+      const cached = userDialogsCache.get(currentUid);
+      if (cached && Date.now() - cached.cachedAt < 90000 && cached.chats.length > 1) {
+        return res.json({ success: true, chats: cached.chats });
+      }
+    }
+
+    // Fetch up to 500 dialogs (includes all PVs, private groups, private channels, public channels, bots)
+    const mainDialogs = await client.getDialogs({ limit: 500 });
+    let archivedDialogs: any[] = [];
+    try {
+      archivedDialogs = await client.getDialogs({ limit: 200, archived: true });
+    } catch {
+      // ignore if archived folder is empty or unsupported
+    }
+
+    const allDialogs = [...mainDialogs, ...archivedDialogs];
+    const seenChatIds = new Set<string>(['me', 'self']);
     const chats: any[] = [];
 
     chats.push({
@@ -964,49 +1051,155 @@ app.get('/api/telegram/chats', async (req: Request, res: Response) => {
       type: 'saved',
       username: 'me',
       unreadCount: 0,
+      isPrivate: true,
+      isArchived: false,
     });
 
-    for (const dialog of dialogs) {
+    for (const dialog of allDialogs) {
       const entity = dialog.entity;
       if (!entity) continue;
-      
-      const id = entity.id?.toString();
-      if (!id || id === 'me' || id === 'self') continue;
 
-      let type = 'user';
-      let title = '';
+      const rawEntityId = entity.id?.toString();
+      if (!rawEntityId || rawEntityId === 'me' || rawEntityId === 'self') continue;
+      if ((entity as any).self || rawEntityId === currentUid) continue;
+
+      const className = (entity as any).className || entity.constructor?.name || '';
+      let markedId = dialog.id?.toString() || rawEntityId;
+
+      if (entity instanceof Api.Channel || className === 'Channel') {
+        const cleanId = rawEntityId.replace(/^-100|^-/, '');
+        markedId = `-100${cleanId}`;
+      } else if (entity instanceof Api.Chat || className === 'Chat') {
+        const cleanId = rawEntityId.replace(/^-/, '');
+        markedId = `-${cleanId}`;
+      } else {
+        markedId = rawEntityId;
+      }
+
+      if (seenChatIds.has(markedId)) continue;
+      seenChatIds.add(markedId);
+
+      // Extract active username (supports both legacy .username and newer .usernames array)
       let username = (entity as any).username || '';
+      if (!username && Array.isArray((entity as any).usernames) && (entity as any).usernames.length > 0) {
+        const activeObj =
+          (entity as any).usernames.find((u: any) => u?.active && u?.username) ||
+          (entity as any).usernames[0];
+        if (activeObj?.username) username = activeObj.username;
+      }
 
-      if ('title' in entity && entity.title) {
-        title = entity.title;
-        if ('megagroup' in entity && entity.megagroup) {
+      // Cache entity & inputEntity so private channels/groups and PVs work seamlessly
+      const peerTarget = dialog.inputEntity || entity;
+      const cacheKeys = [markedId, rawEntityId];
+      if (username) {
+        cacheKeys.push(`@${username}`, username);
+      }
+      cachePeerEntityForUser(currentUid, cacheKeys, peerTarget);
+
+      let type: string = 'user';
+      let title = '';
+
+      if (
+        entity instanceof Api.Channel ||
+        className === 'Channel' ||
+        entity instanceof Api.Chat ||
+        className === 'Chat' ||
+        'title' in entity
+      ) {
+        title = (entity as any).title || dialog.title || dialog.name || `Chat ${rawEntityId}`;
+        if ((entity as any).megagroup) {
           type = 'supergroup';
-        } else if ('broadcast' in entity && entity.broadcast) {
+        } else if ((entity as any).broadcast) {
           type = 'channel';
         } else {
           type = 'group';
         }
-      } else if ('firstName' in entity) {
-        title = `${entity.firstName || ''} ${entity.lastName || ''}`.trim() || 'User';
-        if ('bot' in entity && entity.bot) {
+      } else {
+        // User / PV / Bot
+        if ((entity as any).deleted) {
+          title = 'Deleted Account (حساب حذف‌شده)';
+        } else {
+          const fullName = `${(entity as any).firstName || ''} ${(entity as any).lastName || ''}`.trim();
+          title =
+            fullName ||
+            dialog.title ||
+            dialog.name ||
+            (username ? `@${username}` : '') ||
+            ((entity as any).phone ? `+${(entity as any).phone}` : `User ${rawEntityId}`);
+        }
+
+        if ((entity as any).bot) {
           type = 'bot';
         } else {
           type = 'user';
         }
       }
 
-      if (id === '777000' || title.includes('Telegram')) {
+      if (rawEntityId === '777000' || title === 'Telegram') {
         type = 'service';
       }
 
+      const isArchived = Boolean(
+        (dialog as any).archived || (dialog.dialog as any)?.folderId === 1
+      );
+
       chats.push({
-        id,
+        id: markedId,
         title,
         type,
         username,
         unreadCount: dialog.unreadCount || 0,
+        isPrivate: !username,
+        isArchived,
       });
     }
+
+    // Also include saved contacts (PVs) that might not be in the recent dialog list
+    try {
+      const contactsRes: any = await client.invoke(
+        new Api.contacts.GetContacts({ hash: bigInt(0) })
+      );
+      if (contactsRes && Array.isArray(contactsRes.users)) {
+        for (const u of contactsRes.users) {
+          if (!u || (u as any).self || (u as any).deleted) continue;
+          const uidStr = u.id?.toString();
+          if (!uidStr || uidStr === currentUid || seenChatIds.has(uidStr)) continue;
+          seenChatIds.add(uidStr);
+
+          let username = (u as any).username || '';
+          if (!username && Array.isArray((u as any).usernames) && (u as any).usernames.length > 0) {
+            const activeObj =
+              (u as any).usernames.find((item: any) => item?.active && item?.username) ||
+              (u as any).usernames[0];
+            if (activeObj?.username) username = activeObj.username;
+          }
+
+          const cacheKeys = [uidStr];
+          if (username) cacheKeys.push(`@${username}`, username);
+          cachePeerEntityForUser(currentUid, cacheKeys, u);
+
+          const fullName = `${(u as any).firstName || ''} ${(u as any).lastName || ''}`.trim();
+          const title =
+            fullName ||
+            (username ? `@${username}` : '') ||
+            ((u as any).phone ? `+${(u as any).phone}` : `User ${uidStr}`);
+
+          chats.push({
+            id: uidStr,
+            title,
+            type: (u as any).bot ? 'bot' : 'user',
+            username,
+            unreadCount: 0,
+            isPrivate: !username,
+            isArchived: false,
+          });
+        }
+      }
+    } catch {
+      // Ignore contacts fetch error if restricted
+    }
+
+    userDialogsCache.set(currentUid, { chats, cachedAt: Date.now() });
 
     return res.json({ success: true, chats });
   } catch (err: any) {
@@ -1034,8 +1227,31 @@ app.get('/api/telegram/files', async (req: Request, res: Response) => {
     const category = (req.query.category as string) || 'all';
     const searchQuery = (req.query.search as string)?.toLowerCase() || '';
     const peerParam = (req.query.peer as string) || 'me';
-    const peer = getTargetPeer(peerParam);
-    const currentUid = activeSessions.get(sessionId)?.user?.id || sessionId;
+    const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
+    let peer = getTargetPeer(peerParam, currentUid);
+    // If private chat entity is not yet in cache, warm up dialogs once
+    if (
+      peerParam !== 'me' &&
+      !peerParam.startsWith('@') &&
+      (!userPeerEntityCache.has(currentUid) || !userPeerEntityCache.get(currentUid)?.has(peerParam))
+    ) {
+      try {
+        const warmDialogs = await client.getDialogs({ limit: 300 });
+        for (const d of warmDialogs) {
+          if (!d.entity) continue;
+          const rawId = d.entity.id?.toString();
+          const dId = d.id?.toString();
+          if (rawId || dId) {
+            cachePeerEntityForUser(
+              currentUid,
+              [dId || '', rawId || '', dId ? `-100${rawId}` : '', dId ? `-${rawId}` : ''],
+              d.inputEntity || d.entity
+            );
+          }
+        }
+        peer = getTargetPeer(peerParam, currentUid);
+      } catch {}
+    }
 
     const files: any[] = [];
     const seenIds = new Set<number>();
@@ -1241,7 +1457,8 @@ app.get('/api/telegram/stats', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Not connected to Telegram' });
     }
 
-    const peer = getTargetPeer(req.query.peer);
+    const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
+    const peer = getTargetPeer(req.query.peer, currentUid);
     const messages = await client.getMessages(peer, { limit: 200 });
 
     const stats = {
@@ -1293,13 +1510,18 @@ app.get('/api/telegram/stats', async (req: Request, res: Response) => {
   }
 });
 
-// Helper to parse Telegram URL
+// Helper to parse Telegram URL (supports public channels, /s/ preview URLs, private /c/ links, and topic links)
 function parseTelegramLinkInfo(linkStr: string): { peerParam: string; peer: any; messageId: number; isPrivate: boolean } | null {
   try {
-    const clean = linkStr.trim().replace(/^https?:\/\//i, '').replace(/^www\./i, '');
-    
-    // 1. Match t.me/c/1234567890/123
-    const privateMatch = clean.match(/t\.me\/c\/(\d+)\/(\d+)/i);
+    const clean = linkStr
+      .trim()
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .split('?')[0]
+      .split('#')[0];
+
+    // 1. Match private channel/supergroup: t.me/c/1234567890/123 or t.me/c/1234567890/topicId/123
+    const privateMatch = clean.match(/(?:t\.me|telegram\.me|telegram\.dog)\/c\/(\d+)(?:\/\d+)?\/(\d+)/i);
     if (privateMatch) {
       const channelNum = privateMatch[1];
       const msgId = parseInt(privateMatch[2], 10);
@@ -1307,9 +1529,12 @@ function parseTelegramLinkInfo(linkStr: string): { peerParam: string; peer: any;
       return { peerParam: fullChannelId, peer: bigInt(fullChannelId), messageId: msgId, isPrivate: true };
     }
 
-    // 2. Match t.me/channel_username/123 or telegram.me/username/123
-    const publicMatch = clean.match(/(?:t\.me|telegram\.me|telegram\.dog)\/([a-zA-Z0-9_]+)\/(\d+)/i);
-    if (publicMatch) {
+    // 2. Match public channel/group (including /s/ web view or topic thread):
+    // e.g. t.me/Grove_Street_channel/30790 or t.me/s/Grove_Street_channel/30790 or t.me/group/12/30790
+    const publicMatch = clean.match(
+      /(?:t\.me|telegram\.me|telegram\.dog)\/(?:s\/)?([a-zA-Z0-9_]{3,})(?:\/\d+)?\/(\d+)/i
+    );
+    if (publicMatch && publicMatch[1].toLowerCase() !== 'c') {
       const username = publicMatch[1];
       const msgId = parseInt(publicMatch[2], 10);
       return { peerParam: `@${username}`, peer: `@${username}`, messageId: msgId, isPrivate: false };
@@ -1317,6 +1542,22 @@ function parseTelegramLinkInfo(linkStr: string): { peerParam: string; peer: any;
 
     return null;
   } catch (e) {
+    return null;
+  }
+}
+
+// Helper to extract peer and messageId from internal /api/telegram/stream or /download URLs
+function parseInternalStreamUrl(urlStr: string): { peerParam: string; messageId: number } | null {
+  try {
+    if (!urlStr || typeof urlStr !== 'string') return null;
+    const match = urlStr.match(/\/api\/telegram\/(?:stream|download)\/(\d+)/i);
+    if (!match) return null;
+    const messageId = parseInt(match[1], 10);
+    if (isNaN(messageId)) return null;
+    const peerMatch = urlStr.match(/[?&]peer=([^&]+)/i);
+    const peerParam = peerMatch && peerMatch[1] ? decodeURIComponent(peerMatch[1]) : 'me';
+    return { peerParam, messageId };
+  } catch {
     return null;
   }
 }
@@ -1408,13 +1649,36 @@ app.post('/api/telegram/parse-link', async (req: Request, res: Response) => {
 
     const sessionId = getSessionId(req);
     const client = getActiveClient(sessionId);
-    const currentUid = activeSessions.get(sessionId)?.user?.id || sessionId;
-
+    const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
 
     // If client is connected, fetch real message via MTProto
     if (client) {
       try {
-        const messages = await client.getMessages(parsed.peer, { ids: [parsed.messageId] });
+        let targetPeer = getTargetPeer(parsed.peerParam, currentUid);
+        let messages: any[] = [];
+        try {
+          messages = await client.getMessages(targetPeer, { ids: [parsed.messageId] });
+        } catch {
+          // If private channel is not yet cached in GramJS, warm up dialogs once and retry
+          try {
+            const warmDialogs = await client.getDialogs({ limit: 300 });
+            for (const d of warmDialogs) {
+              if (!d.entity) continue;
+              const rawId = d.entity.id?.toString();
+              const dId = d.id?.toString();
+              if (rawId || dId) {
+                cachePeerEntityForUser(
+                  currentUid,
+                  [dId || '', rawId || '', rawId ? `-100${rawId}` : '', rawId ? `-${rawId}` : ''],
+                  d.inputEntity || d.entity
+                );
+              }
+            }
+            targetPeer = getTargetPeer(parsed.peerParam, currentUid);
+            messages = await client.getMessages(targetPeer, { ids: [parsed.messageId] });
+          } catch {}
+        }
+
         const msg = messages?.[0];
 
         if (!msg) {
@@ -1439,36 +1703,49 @@ app.post('/api/telegram/parse-link', async (req: Request, res: Response) => {
         let width = 0;
         let height = 0;
 
-        if (msg.media instanceof Api.MessageMediaDocument && msg.media.document instanceof Api.Document) {
-          const doc = msg.media.document;
-          size = Number(doc.size || 0);
-          mimeType = doc.mimeType || 'application/octet-stream';
-          hasThumb = Boolean(doc.thumbs && doc.thumbs.length > 0);
+        const mediaObj: any = msg.media;
+        const docObj: any =
+          mediaObj instanceof Api.MessageMediaDocument || mediaObj?.className === 'MessageMediaDocument'
+            ? mediaObj.document
+            : mediaObj?.webpage?.document || null;
+        const photoObj: any =
+          mediaObj instanceof Api.MessageMediaPhoto || mediaObj?.className === 'MessageMediaPhoto'
+            ? mediaObj.photo
+            : mediaObj?.webpage?.photo || null;
 
-          for (const attr of doc.attributes) {
-            if (attr instanceof Api.DocumentAttributeFilename) {
+        if (docObj && (docObj instanceof Api.Document || docObj?.className === 'Document')) {
+          size = Number(docObj.size || 0);
+          mimeType = docObj.mimeType || 'application/octet-stream';
+          hasThumb = Boolean(docObj.thumbs && docObj.thumbs.length > 0);
+
+          for (const attr of docObj.attributes || []) {
+            if (attr instanceof Api.DocumentAttributeFilename || attr?.className === 'DocumentAttributeFilename') {
               filename = attr.fileName;
-            } else if (attr instanceof Api.DocumentAttributeVideo) {
-              duration = attr.duration;
-              width = attr.w;
-              height = attr.h;
-            } else if (attr instanceof Api.DocumentAttributeAudio) {
-              duration = attr.duration;
+            } else if (attr instanceof Api.DocumentAttributeVideo || attr?.className === 'DocumentAttributeVideo') {
+              duration = attr.duration || 0;
+              width = attr.w || 0;
+              height = attr.h || 0;
+            } else if (attr instanceof Api.DocumentAttributeAudio || attr?.className === 'DocumentAttributeAudio') {
+              duration = attr.duration || 0;
               if (attr.title) {
                 filename = `${attr.performer ? attr.performer + ' - ' : ''}${attr.title}.${mimeType.split('/')[1] || 'mp3'}`;
               }
-            } else if (attr instanceof Api.DocumentAttributeImageSize) {
-              width = attr.w;
-              height = attr.h;
+            } else if (attr instanceof Api.DocumentAttributeImageSize || attr?.className === 'DocumentAttributeImageSize') {
+              width = attr.w || 0;
+              height = attr.h || 0;
             }
           }
-        } else if (msg.media instanceof Api.MessageMediaPhoto && msg.media.photo instanceof Api.Photo) {
+          if (!filename || filename === 'file') {
+            const ext = (mimeType.split('/')[1] || 'bin').split(';')[0];
+            filename = `telegram_${msg.id}.${ext}`;
+          }
+        } else if (photoObj && (photoObj instanceof Api.Photo || photoObj?.className === 'Photo')) {
           hasThumb = true;
           mimeType = 'image/jpeg';
           filename = `photo_${msg.id}.jpg`;
-          const photo = msg.media.photo;
-          const largestSize = photo.sizes[photo.sizes.length - 1];
-          if ('size' in largestSize && typeof largestSize.size === 'number') {
+          const sizes = photoObj.sizes || [];
+          const largestSize = sizes[sizes.length - 1];
+          if (largestSize && 'size' in largestSize && typeof largestSize.size === 'number') {
             size = largestSize.size;
           } else {
             size = 250000;
@@ -1479,6 +1756,10 @@ app.post('/api/telegram/parse-link', async (req: Request, res: Response) => {
             error: 'فرمت رسانه این پیام پشتیبانی نمی‌شود.',
           });
         }
+
+        try {
+          if (filename.includes('%')) filename = decodeURIComponent(filename);
+        } catch {}
 
         const accurateMime = getAccurateMimeType(filename, mimeType);
         const fileCategory = getCategoryFromMimeAndExt(accurateMime, filename);
@@ -1558,7 +1839,7 @@ app.post('/api/telegram/parse-link', async (req: Request, res: Response) => {
 });
 
 // ----------------------------------------------------
-// Real-time Remote Transfer: Stream direct URL content into Telegram Saved Messages ('me')
+// Real-time Remote Transfer: Stream direct URL or Telegram post into Saved Messages ('me')
 // ----------------------------------------------------
 interface RemoteTask {
   id: string;
@@ -1586,17 +1867,53 @@ function formatSpeedBytes(bytesPerSec: number): string {
   return `${(bytesPerSec / (1024 * 1024)).toFixed(1)} MB/s`;
 }
 
-// 1. Start Async Remote Upload Task
+// 1. Start Async Remote Upload Task (supports both direct HTTP/HTTPS URLs and Telegram Post Links)
 app.post('/api/telegram/start-remote-upload', async (req: Request, res: Response) => {
   try {
-    const { url, filename, caption } = req.body;
-    if (!url || typeof url !== 'string' || (!url.startsWith('http://') && !url.startsWith('https://'))) {
-      return res.status(400).json({ success: false, error: 'لینک مستقیم معتبر وارد نشده است.' });
+    const {
+      url,
+      telegramLink,
+      peerParam: bodyPeerParam,
+      messageId: bodyMessageId,
+      isDemoFallback,
+      totalSize: bodyTotalSize,
+      filename,
+      caption,
+    } = req.body;
+
+    // Determine if this is a Telegram post transfer or a direct HTTP/HTTPS URL transfer
+    let tgSource: { peerParam: string; messageId: number } | null = null;
+
+    if (!isDemoFallback) {
+      if (bodyPeerParam && bodyMessageId && !isNaN(Number(bodyMessageId))) {
+        tgSource = { peerParam: String(bodyPeerParam), messageId: Number(bodyMessageId) };
+      } else if (telegramLink && typeof telegramLink === 'string') {
+        const parsedTg = parseTelegramLinkInfo(telegramLink);
+        if (parsedTg) {
+          tgSource = { peerParam: parsedTg.peerParam, messageId: parsedTg.messageId };
+        }
+      }
+      if (!tgSource && url && typeof url === 'string') {
+        const parsedFromUrl = parseTelegramLinkInfo(url) || parseInternalStreamUrl(url);
+        if (parsedFromUrl) {
+          tgSource = { peerParam: parsedFromUrl.peerParam, messageId: parsedFromUrl.messageId };
+        }
+      }
+    }
+
+    const isHttpUrl =
+      typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'));
+
+    if (!tgSource && !isHttpUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'لینک معتبر تلگرام یا لینک مستقیم دانلود وارد نشده است.',
+      });
     }
 
     const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     let finalName = filename || 'downloaded_file';
-    if (finalName === 'downloaded_file') {
+    if (finalName === 'downloaded_file' && isHttpUrl) {
       try {
         const urlObj = new URL(url);
         const base = path.basename(urlObj.pathname);
@@ -1604,12 +1921,14 @@ app.post('/api/telegram/start-remote-upload', async (req: Request, res: Response
       } catch (e) {}
     }
 
+    const effectiveUrl = typeof url === 'string' && url ? url : telegramLink || '';
+
     const task: RemoteTask = {
       id: taskId,
-      url,
+      url: effectiveUrl,
       filename: finalName,
-      caption: caption || `فایل دریافت شده از لینک مستقیم:\n${url}`,
-      totalSize: 0,
+      caption: caption ?? (tgSource ? '' : `فایل دریافت شده از لینک مستقیم:\n${effectiveUrl}`),
+      totalSize: Number(bodyTotalSize) || 0,
       loadedSize: 0,
       progress: 0,
       speed: '0 MB/s',
@@ -1623,9 +1942,18 @@ app.post('/api/telegram/start-remote-upload', async (req: Request, res: Response
 
     const sessionId = getSessionId(req);
     const client = getActiveClient(sessionId);
+    const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
 
     // Run execution in background without blocking response
-    executeRemoteTransfer(taskId, client, url, finalName, caption).catch((err) => {
+    executeRemoteTransfer(
+      taskId,
+      client,
+      effectiveUrl,
+      finalName,
+      caption,
+      tgSource,
+      currentUid
+    ).catch((err) => {
       console.error('Remote transfer background error:', err);
       const t = remoteTasksMap.get(taskId);
       if (t) {
@@ -1684,14 +2012,16 @@ async function executeRemoteTransfer(
   client: TelegramClient | null,
   url: string,
   filename: string,
-  caption?: string
+  caption?: string,
+  tgSource?: { peerParam: string; messageId: number } | null,
+  currentUid?: string
 ) {
   const task = remoteTasksMap.get(taskId);
   if (!task) return;
 
   // Handle Demo Mode / Unconnected
   if (!client) {
-    const simulatedTotal = 35 * 1024 * 1024;
+    const simulatedTotal = task.totalSize > 0 ? task.totalSize : 35 * 1024 * 1024;
     task.totalSize = simulatedTotal;
 
     const startTime = Date.now();
@@ -1717,122 +2047,266 @@ async function executeRemoteTransfer(
     return;
   }
 
+  // Case A: Transferring a Telegram Post (e.g. https://t.me/Grove_Street_channel/30790) to Saved Messages ('me')
+  if (tgSource) {
+    let tempFilePath = '';
+    try {
+      const targetPeer = getTargetPeer(tgSource.peerParam, currentUid);
+      const messages = await client.getMessages(targetPeer, { ids: [tgSource.messageId] });
+      const srcMsg = messages?.[0];
 
-async function downloadStreamToFile(
-  targetUrl: string,
-  destPath: string,
-  task: RemoteTask,
-  maxRedirects = 10
-): Promise<{ downloadedBytes: number; contentType: string; totalSize: number }> {
-  return new Promise((resolve, reject) => {
-    function doFetch(currentUrl: string, redirectsLeft: number) {
-      if (redirectsLeft <= 0) {
-        return reject(new Error('تعداد تغییر مسیرها (Redirects) بیش از حد مجاز است'));
+      if (!srcMsg || !srcMsg.media) {
+        throw new Error('پیام یا رسانه مورد نظر در این لینک تلگرام یافت نشد.');
       }
 
-      let parsedUrl: URL;
+      const mediaObj: any = srcMsg.media;
+      const targetMedia =
+        mediaObj?.webpage?.document || mediaObj?.webpage?.photo || srcMsg.media;
+
+      const finalCaption = caption !== undefined ? caption : srcMsg.message || '';
+
+      // 1. Try instant Telegram Cloud copy to Saved Messages ('me')
       try {
-        parsedUrl = new URL(currentUrl);
-      } catch (e) {
-        return reject(new Error('آدرس URL نامعتبر است'));
+        task.phase = 'uploading';
+        task.progress = 65;
+        task.speed = 'Cloud Direct';
+
+        const sentMsg = await client.sendMessage('me', {
+          file: targetMedia,
+          message: finalCaption,
+        });
+
+        if (task.status === 'failed' || task.phase === 'failed') return;
+
+        if (task.totalSize > 0) {
+          task.loadedSize = task.totalSize;
+        }
+        task.progress = 100;
+        task.status = 'completed';
+        task.phase = 'completed';
+        task.messageId = (sentMsg as any)?.id || Date.now();
+        return;
+      } catch (cloudCopyErr: any) {
+        // Fallback: If channel has restricted forwards (CHAT_FORWARDS_RESTRICTED) or cloud copy fails,
+        // stream download via MTProto and re-upload to 'me'
+        console.log('Direct cloud copy restricted, falling back to MTProto stream:', cloudCopyErr?.message);
       }
 
-      const client = parsedUrl.protocol === 'https:' ? https : http;
-      const req = client.get(
-        currentUrl,
-        {
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            Accept: '*/*',
-            'Accept-Encoding': 'identity',
-            Connection: 'keep-alive',
-          },
-          timeout: 120000,
-        },
-        (res) => {
-          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-            const nextUrl = new URL(res.headers.location, currentUrl).toString();
-            res.resume();
-            return doFetch(nextUrl, redirectsLeft - 1);
-          }
-
-          if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
-            res.resume();
-            return reject(new Error(`خطا در دریافت فایل از سرور مقصد (کد: ${res.statusCode})`));
-          }
-
-          const contentLength = res.headers['content-length'];
-          const totalSize = contentLength ? parseInt(contentLength, 10) || 0 : 0;
-          const contentType = (res.headers['content-type'] as string) || '';
-
-          if (totalSize > 0) {
-            task.totalSize = totalSize;
-          }
-
-          const writeStream = fs.createWriteStream(destPath, { highWaterMark: 1024 * 1024 });
-          let downloadedBytes = 0;
-          const downloadStart = Date.now();
-
-          res.on('data', (chunk: Buffer) => {
-            if (task.status === 'failed' || task.phase === 'failed') {
-              req.destroy();
-              res.destroy();
-              writeStream.destroy();
-              return;
-            }
-
-            downloadedBytes += chunk.length;
-            task.loadedSize = downloadedBytes;
-
-            if (task.totalSize > 0) {
-              task.progress = Math.min(Math.round((downloadedBytes / task.totalSize) * 50), 49);
-            } else {
-              task.progress = 25;
-            }
-
-            const elapsedSec = (Date.now() - downloadStart) / 1000 || 0.1;
-            const bytesPerSec = downloadedBytes / elapsedSec;
-            task.speedBytesPerSec = bytesPerSec;
-            task.speed = formatSpeedBytes(bytesPerSec);
-          });
-
-          res.pipe(writeStream);
-
-          writeStream.on('finish', () => {
-            writeStream.close(() => {
-              resolve({ downloadedBytes, contentType, totalSize });
-            });
-          });
-
-          writeStream.on('error', (err) => {
-            req.destroy();
-            res.destroy();
-            reject(err);
-          });
-
-          res.on('error', (err) => {
-            writeStream.destroy();
-            reject(err);
-          });
-        }
+      // 2. Fallback: Stream download via MTProto iterDownload -> Upload to 'me'
+      task.phase = 'downloading';
+      task.progress = 1;
+      tempFilePath = path.join(
+        '/tmp',
+        `tg_tx_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.tmp`
       );
 
-      req.on('error', (err) => {
-        reject(err);
+      const writeStream = fs.createWriteStream(tempFilePath, { highWaterMark: 1024 * 1024 });
+      let downloadedBytes = 0;
+      const dlStart = Date.now();
+
+      for await (const chunk of client.iterDownload({
+        file: targetMedia,
+        offset: bigInt(0),
+        requestSize: 256 * 1024,
+      })) {
+        if (task.status === 'failed' || task.phase === 'failed') {
+          writeStream.destroy();
+          return;
+        }
+        const buf = Buffer.from(chunk);
+        const canWrite = writeStream.write(buf);
+        if (!canWrite) {
+          await new Promise<void>((resolve) => writeStream.once('drain', () => resolve()));
+        }
+
+        downloadedBytes += buf.length;
+        task.loadedSize = downloadedBytes;
+        if (task.totalSize > 0) {
+          task.progress = Math.min(Math.round((downloadedBytes / task.totalSize) * 50), 49);
+        } else {
+          task.progress = 25;
+        }
+        const elapsedSec = (Date.now() - dlStart) / 1000 || 0.1;
+        const bps = downloadedBytes / elapsedSec;
+        task.speedBytesPerSec = bps;
+        task.speed = formatSpeedBytes(bps);
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        writeStream.end(() => resolve());
+        writeStream.on('error', reject);
       });
 
-      req.on('timeout', () => {
-        req.destroy();
-        reject(new Error('اتصال به سرور مقصد زمان‌بر شد (Timeout)'));
+      if (task.status === 'failed' || task.phase === 'failed') return;
+
+      task.totalSize = downloadedBytes;
+      task.loadedSize = downloadedBytes;
+      task.phase = 'uploading';
+
+      const fileMime = getAccurateMimeType(filename);
+      const customFile = new CustomFile(filename, downloadedBytes, tempFilePath);
+      const uploadStart = Date.now();
+
+      const uploadedMsg = await client.sendFile('me', {
+        file: customFile,
+        caption: finalCaption,
+        forceDocument: !fileMime.startsWith('image/'),
+        workers: 16,
+        progressCallback: (progressFraction: number) => {
+          if (task.status === 'failed' || task.phase === 'failed') {
+            throw new Error('CANCELLED');
+          }
+          const p = Math.max(0, Math.min(1, progressFraction));
+          task.progress = 50 + Math.round(p * 50);
+
+          const uploadedBytes = Math.round(p * downloadedBytes);
+          const elapsedSec = (Date.now() - uploadStart) / 1000 || 0.1;
+          const bytesPerSec = uploadedBytes / elapsedSec;
+          task.speedBytesPerSec = bytesPerSec;
+          task.speed = formatSpeedBytes(bytesPerSec);
+          task.loadedSize = uploadedBytes;
+        },
       });
+
+      if (task.status === 'failed' || task.phase === 'failed') return;
+
+      task.progress = 100;
+      task.status = 'completed';
+      task.phase = 'completed';
+      task.messageId = (uploadedMsg as any)?.id || Date.now();
+      return;
+    } catch (err: any) {
+      if (err?.message === 'CANCELLED' || task.status === 'failed') {
+        return;
+      }
+      task.status = 'failed';
+      task.phase = 'failed';
+      task.error = err?.message || 'خطا در انتقال پست تلگرام به سیو مسیج';
+      return;
+    } finally {
+      if (tempFilePath) {
+        try {
+          await fs.promises.unlink(tempFilePath);
+        } catch {}
+      }
     }
+  }
 
-    doFetch(targetUrl, maxRedirects);
-  });
-}
+  async function downloadStreamToFile(
+    targetUrl: string,
+    destPath: string,
+    task: RemoteTask,
+    maxRedirects = 10
+  ): Promise<{ downloadedBytes: number; contentType: string; totalSize: number }> {
+    return new Promise((resolve, reject) => {
+      function doFetch(currentUrl: string, redirectsLeft: number) {
+        if (redirectsLeft <= 0) {
+          return reject(new Error('تعداد تغییر مسیرها (Redirects) بیش از حد مجاز است'));
+        }
 
-  // Real MTProto & Remote Stream Execution
+        let parsedUrl: URL;
+        try {
+          parsedUrl = new URL(currentUrl);
+        } catch (e) {
+          return reject(new Error('آدرس URL نامعتبر است'));
+        }
+
+        const httpClient = parsedUrl.protocol === 'https:' ? https : http;
+        const req = httpClient.get(
+          currentUrl,
+          {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              Accept: '*/*',
+              'Accept-Encoding': 'identity',
+              Connection: 'keep-alive',
+            },
+            timeout: 120000,
+          },
+          (res) => {
+            if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+              const nextUrl = new URL(res.headers.location, currentUrl).toString();
+              res.resume();
+              return doFetch(nextUrl, redirectsLeft - 1);
+            }
+
+            if (res.statusCode && (res.statusCode < 200 || res.statusCode >= 300)) {
+              res.resume();
+              return reject(new Error(`خطا در دریافت فایل از سرور مقصد (کد: ${res.statusCode})`));
+            }
+
+            const contentLength = res.headers['content-length'];
+            const totalSize = contentLength ? parseInt(contentLength, 10) || 0 : 0;
+            const contentType = (res.headers['content-type'] as string) || '';
+
+            if (totalSize > 0) {
+              task.totalSize = totalSize;
+            }
+
+            const writeStream = fs.createWriteStream(destPath, { highWaterMark: 1024 * 1024 });
+            let downloadedBytes = 0;
+            const downloadStart = Date.now();
+
+            res.on('data', (chunk: Buffer) => {
+              if (task.status === 'failed' || task.phase === 'failed') {
+                req.destroy();
+                res.destroy();
+                writeStream.destroy();
+                return;
+              }
+
+              downloadedBytes += chunk.length;
+              task.loadedSize = downloadedBytes;
+
+              if (task.totalSize > 0) {
+                task.progress = Math.min(Math.round((downloadedBytes / task.totalSize) * 50), 49);
+              } else {
+                task.progress = 25;
+              }
+
+              const elapsedSec = (Date.now() - downloadStart) / 1000 || 0.1;
+              const bytesPerSec = downloadedBytes / elapsedSec;
+              task.speedBytesPerSec = bytesPerSec;
+              task.speed = formatSpeedBytes(bytesPerSec);
+            });
+
+            res.pipe(writeStream);
+
+            writeStream.on('finish', () => {
+              writeStream.close(() => {
+                resolve({ downloadedBytes, contentType, totalSize });
+              });
+            });
+
+            writeStream.on('error', (err) => {
+              req.destroy();
+              res.destroy();
+              reject(err);
+            });
+
+            res.on('error', (err) => {
+              writeStream.destroy();
+              reject(err);
+            });
+          }
+        );
+
+        req.on('error', (err) => {
+          reject(err);
+        });
+
+        req.on('timeout', () => {
+          req.destroy();
+          reject(new Error('اتصال به سرور مقصد زمان‌بر شد (Timeout)'));
+        });
+      }
+
+      doFetch(targetUrl, maxRedirects);
+    });
+  }
+
+  // Case B: Real MTProto & Remote Direct HTTP/HTTPS Stream Execution
   const tempFilePath = path.join('/tmp', `remote_tx_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.tmp`);
 
   try {
@@ -1920,13 +2394,26 @@ app.get('/api/telegram/remote-upload-status/:taskId', (req: Request, res: Respon
 // Legacy synchronous remote-upload endpoint
 app.post('/api/telegram/remote-upload', async (req: Request, res: Response) => {
   try {
-    const { url, filename, caption } = req.body;
-    if (!url || typeof url !== 'string' || (!url.startsWith('http://') && !url.startsWith('https://'))) {
-      return res.status(400).json({ success: false, error: 'لینک مستقیم معتبر وارد نشده است.' });
-    }
-
+    const { url, telegramLink, peerParam: bodyPeerParam, messageId: bodyMessageId, filename, caption } = req.body;
     const sessionId = getSessionId(req);
     const client = getActiveClient(sessionId);
+    const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
+
+    let tgSource: { peerParam: string; messageId: number } | null = null;
+    if (bodyPeerParam && bodyMessageId && !isNaN(Number(bodyMessageId))) {
+      tgSource = { peerParam: String(bodyPeerParam), messageId: Number(bodyMessageId) };
+    } else if (telegramLink && typeof telegramLink === 'string') {
+      const parsedTg = parseTelegramLinkInfo(telegramLink);
+      if (parsedTg) tgSource = { peerParam: parsedTg.peerParam, messageId: parsedTg.messageId };
+    } else if (url && typeof url === 'string') {
+      const parsedFromUrl = parseTelegramLinkInfo(url) || parseInternalStreamUrl(url);
+      if (parsedFromUrl) tgSource = { peerParam: parsedFromUrl.peerParam, messageId: parsedFromUrl.messageId };
+    }
+
+    const isHttpUrl = typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'));
+    if (!tgSource && !isHttpUrl) {
+      return res.status(400).json({ success: false, error: 'لینک معتبر تلگرام یا لینک مستقیم وارد نشده است.' });
+    }
 
     if (!client) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -1935,6 +2422,25 @@ app.post('/api/telegram/remote-upload', async (req: Request, res: Response) => {
         messageId: Date.now(),
         filename: filename || 'remote_file.mp4',
         message: 'فایل با موفقیت در محیط آزمایشی ثبت شد. جهت ذخیره در تلگرام واقعی، لاگین کنید.',
+      });
+    }
+
+    if (tgSource) {
+      const peer = getTargetPeer(tgSource.peerParam, currentUid);
+      const msgs = await client.getMessages(peer, { ids: [tgSource.messageId] });
+      const srcMsg = msgs?.[0];
+      if (!srcMsg || !srcMsg.media) {
+        return res.status(404).json({ success: false, error: 'رسانه‌ای در این پست تلگرام یافت نشد.' });
+      }
+      const sent = await client.sendMessage('me', {
+        file: srcMsg.media,
+        message: caption !== undefined ? caption : srcMsg.message || '',
+      });
+      return res.json({
+        success: true,
+        messageId: (sent as any)?.id || Date.now(),
+        filename: filename || 'telegram_media',
+        message: 'فایل با موفقیت به سیو مسیج تلگرام ارسال شد!',
       });
     }
 
@@ -1974,9 +2480,9 @@ app.post('/api/telegram/remote-upload', async (req: Request, res: Response) => {
         workers: 16,
       });
 
-    const msgId = (uploadedMessage as any)?.id || Date.now();
+      const msgId = (uploadedMessage as any)?.id || Date.now();
 
-    return res.json({
+      return res.json({
         success: true,
         messageId: msgId,
         filename: finalName,
@@ -2014,7 +2520,7 @@ app.get('/api/telegram/thumbnail/:messageId', async (req: Request, res: Response
       return res.status(400).send('Invalid request');
     }
 
-    const currentUid = activeSessions.get(sessionId)?.user?.id || sessionId;
+    const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
     const peerParam = String(req.query.peer || 'me');
     const cacheKey = `${currentUid}_${peerParam}_${messageId}`;
 
@@ -2026,7 +2532,7 @@ app.get('/api/telegram/thumbnail/:messageId', async (req: Request, res: Response
       return res.send(cached.buffer);
     }
 
-    const peer = getTargetPeer(req.query.peer);
+    const peer = getTargetPeer(req.query.peer, currentUid);
     const messages = await client.getMessages(peer, { ids: [messageId] });
     const msg = messages?.[0];
     if (!msg || !msg.media) {
@@ -2072,7 +2578,8 @@ app.get(['/api/telegram/stream/:messageId/:filename?', '/api/telegram/download/:
       return res.status(401).json({ error: 'Session not authenticated or message ID invalid' });
     }
 
-    const peer = getTargetPeer(req.query.peer);
+    const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
+    const peer = getTargetPeer(req.query.peer, currentUid);
     const messages = await client.getMessages(peer, { ids: [messageId] });
     const msg = messages?.[0];
     if (!msg || !msg.media) {
@@ -2203,7 +2710,8 @@ app.get(['/api/telegram/transcode/:messageId/:filename?', '/api/telegram/transco
         return res.status(401).json({ error: 'Not authenticated with Telegram' });
       }
 
-      const peer = getTargetPeer(req.query.peer);
+      const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
+      const peer = getTargetPeer(req.query.peer, currentUid);
       const messages = await client.getMessages(peer, { ids: [messageId] });
       const msg = messages?.[0];
       if (!msg || !msg.media) {

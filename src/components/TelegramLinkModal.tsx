@@ -199,6 +199,12 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url: extractedMedia.directUrl,
+          telegramLink: extractedMedia.telegramLink || linkInput.trim(),
+          peerParam: extractedMedia.peerParam,
+          messageId: extractedMedia.id,
+          isDirectUrl: Boolean(extractedMedia.isDirectUrl),
+          isDemoFallback: Boolean(extractedMedia.isDemoFallback),
+          totalSize: extractedMedia.size || 0,
           filename: extractedMedia.filename,
           caption: extractedMedia.caption || extractedMedia.filename,
         }),

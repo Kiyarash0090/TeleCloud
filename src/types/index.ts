@@ -27,6 +27,8 @@ export interface TelegramChat {
   type: 'saved' | 'channel' | 'user' | 'bot' | 'group' | 'supergroup' | 'service';
   username?: string;
   unreadCount?: number;
+  isPrivate?: boolean;
+  isArchived?: boolean;
 }
 
 export interface StorageCategoryStats {
@@ -83,6 +85,7 @@ export interface UploadQueueItem {
   status: 'queued' | 'uploading' | 'completed' | 'failed' | 'cancelled';
   speed: string;
   startedAt?: number;
+  completedAt?: number;
   error?: string;
   messageId?: number;
 }
