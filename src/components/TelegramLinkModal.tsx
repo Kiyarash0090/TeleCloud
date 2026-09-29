@@ -38,8 +38,20 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
     setActiveImage,
     setActiveDoc,
     refreshFiles,
+    activePeer,
+    activeChatTitle,
+    canUploadInActiveChat,
   } = useTelegram();
   const { t, lang } = useTheme();
+
+  const isSavedMessages = !activePeer || activePeer === 'me';
+  const targetPeerToSend = canUploadInActiveChat ? (activePeer || 'me') : 'me';
+  const targetDisplayTitle =
+    targetPeerToSend === 'me'
+      ? lang === 'fa'
+        ? 'سیو مسیج'
+        : 'Saved Messages'
+      : activeChatTitle || targetPeerToSend;
 
   const [linkInput, setLinkInput] = useState(initialLink);
   const [isLoading, setIsLoading] = useState(false);
@@ -201,6 +213,7 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
           url: extractedMedia.directUrl,
           telegramLink: extractedMedia.telegramLink || linkInput.trim(),
           peerParam: extractedMedia.peerParam,
+          targetPeer: targetPeerToSend,
           messageId: extractedMedia.id,
           isDirectUrl: Boolean(extractedMedia.isDirectUrl),
           isDemoFallback: Boolean(extractedMedia.isDemoFallback),
@@ -512,7 +525,7 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
                       <span className="text-xs font-bold text-sky-100">
                         {remoteTask.phase === 'downloading'
                           ? (lang === 'fa' ? 'فاز ۱ از ۲: دریافت فایل از سرور مقصد...' : 'Phase 1/2: Downloading from source...')
-                          : (lang === 'fa' ? 'فاز ۲ از ۲: ارسال سریع به سیو مسیج تلگرام...' : 'Phase 2/2: Streaming to Telegram Saved Messages...')}
+                          : (lang === 'fa' ? `فاز ۲ از ۲: ارسال سریع به «${targetDisplayTitle}»...` : `Phase 2/2: Streaming to "${targetDisplayTitle}"...`)}
                       </span>
                     </div>
 
@@ -566,12 +579,20 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
                     {saveSuccess ? (
                       <>
                         <Check className="w-5 h-5 text-emerald-300 stroke-[3]" />
-                        <span className="text-emerald-100">{lang === 'fa' ? 'فایل با موفقیت در سیو مسیج تلگرام ذخیره شد!' : 'File successfully sent to Saved Messages!'}</span>
+                        <span className="text-emerald-100">
+                          {lang === 'fa'
+                            ? `فایل با موفقیت در «${targetDisplayTitle}» ذخیره شد!`
+                            : `File successfully sent to "${targetDisplayTitle}"!`}
+                        </span>
                       </>
                     ) : (
                       <>
                         <Send className="w-5 h-5 stroke-[2.2]" />
-                        <span>{lang === 'fa' ? 'ارسال مستقیم محتوا به سیو مسیج تلگرام' : 'Send Content Directly to Saved Messages'}</span>
+                        <span>
+                          {lang === 'fa'
+                            ? `ارسال مستقیم محتوا به «${targetDisplayTitle}»`
+                            : `Send Content Directly to "${targetDisplayTitle}"`}
+                        </span>
                       </>
                     )}
                   </button>

@@ -42,6 +42,7 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
     setIsLoginModalOpen,
     setIsUploadModalOpen,
     setIsTelegramLinkModalOpen,
+    canUploadInActiveChat,
     filteredFiles,
   } = useTelegram();
 
@@ -175,8 +176,19 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
         </div>
       </div>
 
-      {/* End Controls: View Switcher, Language, Theme */}
+      {/* End Controls: Quick Upload, View Switcher, Language, Theme */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        {canUploadInActiveChat && (
+          <button
+            onClick={() => setIsUploadModalOpen(true)}
+            className="hidden sm:flex items-center gap-1.5 px-3 h-9 md:h-10 rounded-xl bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
+            title={t('upload')}
+          >
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span className="hidden lg:inline">{t('upload')}</span>
+          </button>
+        )}
+
         {/* View Mode Switcher */}
         <div className="h-9 md:h-10 flex items-center bg-slate-100 dark:bg-zinc-800/90 p-1 rounded-xl border border-slate-200/80 dark:border-zinc-700/70">
           <button

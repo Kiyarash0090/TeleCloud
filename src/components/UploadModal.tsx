@@ -10,11 +10,18 @@ interface UploadModalProps {
 
 export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
   const { t, lang } = useTheme();
-  const { isConnected, isDemoMode, setIsLoginModalOpen } = useTelegram();
+  const { isConnected, isDemoMode, setIsLoginModalOpen, activePeer, activeChatTitle } = useTelegram();
   const { addFilesToQueue } = useQueue();
 
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isSavedMessages = !activePeer || activePeer === 'me';
+  const targetDisplayTitle = isSavedMessages
+    ? lang === 'fa'
+      ? 'پیام‌های ذخیره‌شده (Saved Messages)'
+      : 'Saved Messages'
+    : activeChatTitle || activePeer;
 
   const handleFiles = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
@@ -38,17 +45,17 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
 
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3.5 sm:px-5 sm:py-4 border-b border-slate-100 dark:border-zinc-800">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
               <FileUp className="w-5 h-5" />
             </div>
-            <div>
-              <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">
+            <div className="min-w-0">
+              <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">
                 {t('upload')}
               </h3>
-              <p className="text-[11px] text-slate-400 dark:text-zinc-500 flex items-center gap-1">
+              <p className="text-[11px] text-slate-400 dark:text-zinc-500 flex items-center gap-1 truncate">
                 <Cpu className="w-3 h-3 text-emerald-500 shrink-0" />
-                <span>{t('zeroDiskNotice')}</span>
+                <span className="truncate">{t('zeroDiskNotice')}</span>
               </p>
             </div>
           </div>
@@ -62,15 +69,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
 
         {/* Body */}
         <div className="p-4 sm:p-6 space-y-4 overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-6">
-          {/* Connection Status Banner */}
+          {/* Connection & Destination Status Banner */}
           {isConnected ? (
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-300 text-xs">
-              <div className="flex items-center gap-2 font-medium">
+            <div className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-300 text-xs">
+              <div className="flex items-center gap-2 font-medium min-w-0">
                 <Sparkles className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>
+                <span className="truncate" dir="auto">
                   {lang === 'fa'
-                    ? 'آپلود مستقیم به سیو مسیج تلگرام فعال است'
-                    : 'Direct upload to Telegram Saved Messages active'}
+                    ? `آپلود مستقیم به: ${targetDisplayTitle}`
+                    : `Direct upload to: ${targetDisplayTitle}`}
                 </span>
               </div>
               <span className="font-mono font-bold bg-emerald-100 dark:bg-emerald-900/50 px-2 py-0.5 rounded-md shrink-0">
@@ -84,11 +91,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
                 <span>
                   {isDemoMode
                     ? lang === 'fa'
-                      ? 'در حالت دمو هستید. برای آپلود واقعی به اکانت تلگرام متصل شوید.'
-                      : 'Demo mode active. Connect your Telegram account for real uploads.'
+                      ? `حالت دمو (${targetDisplayTitle}). برای آپلود واقعی به تلگرام متصل شوید.`
+                      : `Demo mode (${targetDisplayTitle}). Connect Telegram for real uploads.`
                     : lang === 'fa'
-                    ? 'ابتدا به اکانت تلگرام خود متصل شوید تا فایل‌ها به سیو مسیج ارسال شوند.'
-                    : 'Connect your Telegram account to upload files to Saved Messages.'}
+                    ? 'ابتدا به اکانت تلگرام خود متصل شوید تا فایل‌ها ارسال شوند.'
+                    : 'Connect your Telegram account to upload files.'}
                 </span>
               </div>
               <button

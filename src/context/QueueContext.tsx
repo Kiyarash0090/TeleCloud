@@ -20,10 +20,14 @@ export function QueueProvider({
   children,
   onUploadSuccess,
   activePeer = 'me',
+  activeChatTitle = 'Saved Messages',
+  canUpload = true,
 }: {
   children: React.ReactNode;
-  onUploadSuccess?: () => void;
+  onUploadSuccess?: (forceReload?: boolean) => void;
   activePeer?: string;
+  activeChatTitle?: string;
+  canUpload?: boolean;
 }) {
   const [queue, setQueue] = useState<UploadQueueItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -31,9 +35,12 @@ export function QueueProvider({
   const isProcessingRef = useRef(false);
 
   const addFilesToQueue = (files: FileList | File[]) => {
-    if (activePeer && activePeer !== 'me') {
+    if (!canUpload) {
       return;
     }
+
+    const targetPeer = activePeer || 'me';
+    const targetTitle = activeChatTitle || 'Saved Messages';
 
     const newItems: UploadQueueItem[] = Array.from(files).map(file => ({
       id: `task_${Date.now()}_${Math.random().toString(36).substring(5)}`,
@@ -43,6 +50,8 @@ export function QueueProvider({
       progress: 0,
       status: 'queued',
       speed: '0 KB/s',
+      targetPeer,
+      targetChatTitle: targetTitle,
     }));
 
     setQueue(prev => [...prev, ...newItems]);
@@ -107,7 +116,7 @@ export function QueueProvider({
     const formData = new FormData();
     formData.append('file', queuedItem.file);
     formData.append('caption', queuedItem.name);
-    formData.append('peer', 'me');
+    formData.append('peer', queuedItem.targetPeer || activePeer || 'me');
 
     const xhr = new XMLHttpRequest();
     activeXhrs.current.set(queuedItem.id, xhr);

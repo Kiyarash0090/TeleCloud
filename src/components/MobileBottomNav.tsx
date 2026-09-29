@@ -19,7 +19,7 @@ export function MobileBottomNav() {
     setIsTelegramLinkModalOpen,
     isAccountDrawerOpen,
     setIsAccountDrawerOpen,
-    activePeer,
+    canUploadInActiveChat,
     user,
     isConnected,
     favoriteFileIds,
@@ -106,8 +106,8 @@ export function MobileBottomNav() {
         <span className="text-[10px] mt-0.5 font-semibold truncate">{t('favorites')}</span>
       </button>
 
-      {/* 3. Center Hero Action: Instant Upload (Only in Saved Messages) */}
-      {(!activePeer || activePeer === 'me') && (
+      {/* 3. Center Hero Action: Instant Upload (In any writable chat: Saved, Bot, PV, Admin Channel, Accessible Group) */}
+      {canUploadInActiveChat && (
         <div className="flex-1 flex justify-center">
           <button
             onClick={() => setIsUploadModalOpen(true)}

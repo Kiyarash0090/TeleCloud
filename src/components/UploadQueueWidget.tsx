@@ -487,7 +487,7 @@ export const UploadQueueWidget: React.FC = () => {
                         : 'Phase 2: Sending to Telegram...'
                       : task.status === 'completed'
                       ? lang === 'fa'
-                        ? 'با موفقیت در سیو مسیج ذخیره شد'
+                        ? 'با موفقیت در تلگرام ذخیره شد'
                         : 'Saved to Telegram'
                       : lang === 'fa'
                       ? 'خطا در انتقال'
@@ -574,13 +574,20 @@ export const UploadQueueWidget: React.FC = () => {
                     {(task.status === 'failed' || task.status === 'cancelled') && (
                       <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
                     )}
-                    <span
-                      className="text-xs font-semibold text-slate-800 dark:text-zinc-200 truncate"
-                      title={task.name}
-                      dir="auto"
-                    >
-                      {task.name}
-                    </span>
+                    <div className="min-w-0 flex flex-col">
+                      <span
+                        className="text-xs font-semibold text-slate-800 dark:text-zinc-200 truncate"
+                        title={task.name}
+                        dir="auto"
+                      >
+                        {task.name}
+                      </span>
+                      {task.targetChatTitle && (
+                        <span className="text-[10px] text-slate-400 dark:text-zinc-500 truncate" dir="auto">
+                          {lang === 'fa' ? `مقصد: ${task.targetChatTitle}` : `To: ${task.targetChatTitle}`}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">

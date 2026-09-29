@@ -970,21 +970,139 @@ app.post('/api/telegram/logout', async (req: Request, res: Response) => {
 
 // Per-user entity cache so private channels, private groups, and PVs without usernames resolve with accessHash
 const userPeerEntityCache = new Map<string, Map<string, any>>();
+const userPeerRawEntityCache = new Map<string, Map<string, any>>();
 const userDialogsCache = new Map<string, { chats: any[]; cachedAt: number }>();
 
-function cachePeerEntityForUser(uid: string, keys: string[], targetEntity: any) {
+export interface PeerPermissions {
+  canUpload: boolean;
+  canDelete: boolean;
+  isAdmin: boolean;
+  type: 'saved' | 'channel' | 'user' | 'bot' | 'group' | 'supergroup' | 'service';
+}
+
+function evaluatePeerPermissions(entity: any, explicitType?: string): PeerPermissions {
+  if (!entity || entity === 'me' || entity === 'self' || (entity as any)?.self || explicitType === 'saved') {
+    return { canUpload: true, canDelete: true, isAdmin: true, type: 'saved' };
+  }
+
+  const className = (entity as any).className || entity.constructor?.name || '';
+  const rawEntityId = entity.id?.toString() || '';
+
+  if (rawEntityId === '777000' || explicitType === 'service') {
+    return { canUpload: false, canDelete: false, isAdmin: false, type: 'service' };
+  }
+
+  // Channel or Supergroup
+  if (entity instanceof Api.Channel || className === 'Channel' || explicitType === 'channel' || explicitType === 'supergroup') {
+    const isLeftOrKicked = Boolean((entity as any).left || (entity as any).kicked || (entity as any).deactivated);
+    const isBroadcast = Boolean((entity as any).broadcast && !(entity as any).megagroup);
+    const resolvedType = isBroadcast ? 'channel' : 'supergroup';
+
+    if (isLeftOrKicked) {
+      return { canUpload: false, canDelete: false, isAdmin: false, type: resolvedType };
+    }
+
+    const isCreator = Boolean((entity as any).creator);
+    const adminRights = (entity as any).adminRights;
+    const isAdmin = Boolean(isCreator || adminRights);
+
+    if (isBroadcast) {
+      // Broadcast channel: only admins can upload or delete
+      const canUpload = Boolean(isCreator || adminRights?.postMessages || isAdmin);
+      const canDelete = Boolean(isCreator || adminRights?.deleteMessages || adminRights?.postMessages || isAdmin);
+      return { canUpload, canDelete, isAdmin, type: 'channel' };
+    } else {
+      // Supergroup: admins always have access; regular members have access unless restricted
+      if (isAdmin) {
+        return { canUpload: true, canDelete: true, isAdmin: true, type: 'supergroup' };
+      }
+      const banned = (entity as any).bannedRights;
+      const defBanned = (entity as any).defaultBannedRights;
+      const cannotSend =
+        Boolean(banned?.viewMessages || banned?.sendMessages || banned?.sendMedia) ||
+        Boolean(defBanned?.sendMessages || defBanned?.sendMedia);
+      return {
+        canUpload: !cannotSend,
+        canDelete: !cannotSend,
+        isAdmin: false,
+        type: 'supergroup',
+      };
+    }
+  }
+
+  // Basic Group (Api.Chat)
+  if (entity instanceof Api.Chat || className === 'Chat' || explicitType === 'group') {
+    const isInactive = Boolean((entity as any).left || (entity as any).kicked || (entity as any).deactivated);
+    if (isInactive) {
+      return { canUpload: false, canDelete: false, isAdmin: false, type: 'group' };
+    }
+    const isCreator = Boolean((entity as any).creator);
+    const adminRights = (entity as any).adminRights;
+    const isAdmin = Boolean(isCreator || adminRights);
+    if (isAdmin) {
+      return { canUpload: true, canDelete: true, isAdmin: true, type: 'group' };
+    }
+    const defBanned = (entity as any).defaultBannedRights;
+    const cannotSend = Boolean(defBanned?.sendMessages || defBanned?.sendMedia);
+    return {
+      canUpload: !cannotSend,
+      canDelete: !cannotSend,
+      isAdmin: false,
+      type: 'group',
+    };
+  }
+
+  // Bot or PV (Api.User)
+  const isBot = Boolean((entity as any).bot || explicitType === 'bot');
+  const isDeleted = Boolean((entity as any).deleted);
+  return {
+    canUpload: !isDeleted,
+    canDelete: true,
+    isAdmin: false,
+    type: isBot ? 'bot' : 'user',
+  };
+}
+
+function cachePeerEntityForUser(uid: string, keys: string[], targetEntity: any, rawEntity?: any) {
   if (!uid || !targetEntity) return;
   let map = userPeerEntityCache.get(uid);
   if (!map) {
     map = new Map<string, any>();
     userPeerEntityCache.set(uid, map);
   }
+  let rawMap = userPeerRawEntityCache.get(uid);
+  if (!rawMap) {
+    rawMap = new Map<string, any>();
+    userPeerRawEntityCache.set(uid, rawMap);
+  }
+  const actualRaw = rawEntity || targetEntity;
   for (const k of keys) {
     if (k) {
-      map.set(String(k), targetEntity);
-      map.set(String(k).toLowerCase(), targetEntity);
+      const cleanKey = String(k).trim();
+      if (!cleanKey) continue;
+      map.set(cleanKey, targetEntity);
+      map.set(cleanKey.toLowerCase(), targetEntity);
+      rawMap.set(cleanKey, actualRaw);
+      rawMap.set(cleanKey.toLowerCase(), actualRaw);
     }
   }
+}
+
+function getCachedRawEntity(peerParam: any, currentUid?: string): any {
+  if (!peerParam || peerParam === 'me' || peerParam === 'self') return 'me';
+  const peerStr = String(peerParam).trim();
+  if (!peerStr || peerStr === 'me' || peerStr === 'self') return 'me';
+
+  if (currentUid && userPeerRawEntityCache.has(currentUid)) {
+    const rawMap = userPeerRawEntityCache.get(currentUid)!;
+    const found = rawMap.get(peerStr) || rawMap.get(peerStr.toLowerCase());
+    if (found) return found;
+  }
+  for (const rawMap of userPeerRawEntityCache.values()) {
+    const found = rawMap.get(peerStr) || rawMap.get(peerStr.toLowerCase());
+    if (found) return found;
+  }
+  return null;
 }
 
 // Helper to parse target peer (Saved Messages 'me', channel/group/user id or username)
@@ -1010,6 +1128,64 @@ function getTargetPeer(peerParam: any, currentUid?: string): any {
     return bigInt(peerStr);
   }
   return peerStr;
+}
+
+async function resolveTargetPeerAndEntity(
+  client: TelegramClient,
+  peerParam: string,
+  currentUid: string
+): Promise<{ peer: any; rawEntity: any; permissions: PeerPermissions }> {
+  const cleanPeer = (peerParam || 'me').toString().trim() || 'me';
+  if (cleanPeer === 'me' || cleanPeer === 'self') {
+    return {
+      peer: 'me',
+      rawEntity: 'me',
+      permissions: { canUpload: true, canDelete: true, isAdmin: true, type: 'saved' },
+    };
+  }
+
+  // Warm up dialog cache if entity not yet cached
+  if (!getCachedRawEntity(cleanPeer, currentUid)) {
+    try {
+      const warmDialogs = await client.getDialogs({ limit: 350 });
+      for (const d of warmDialogs) {
+        if (!d.entity) continue;
+        const rawId = d.entity.id?.toString();
+        const dId = d.id?.toString();
+        const className = (d.entity as any).className || d.entity.constructor?.name || '';
+        let markedId = dId || rawId || '';
+        if (d.entity instanceof Api.Channel || className === 'Channel') {
+          const cId = (rawId || '').replace(/^-100|^-/, '');
+          markedId = `-100${cId}`;
+        } else if (d.entity instanceof Api.Chat || className === 'Chat') {
+          const cId = (rawId || '').replace(/^-/, '');
+          markedId = `-${cId}`;
+        }
+        const username = (d.entity as any).username || '';
+        const keys = [markedId, dId || '', rawId || ''];
+        if (username) keys.push(`@${username}`, username);
+        cachePeerEntityForUser(currentUid, keys, d.inputEntity || d.entity, d.entity);
+      }
+    } catch {}
+  }
+
+  const peer = getTargetPeer(cleanPeer, currentUid);
+  let rawEntity = getCachedRawEntity(cleanPeer, currentUid);
+
+  if (!rawEntity) {
+    try {
+      rawEntity = await client.getEntity(peer);
+      if (rawEntity) {
+        cachePeerEntityForUser(currentUid, [cleanPeer], rawEntity, rawEntity);
+      }
+    } catch {}
+  }
+
+  const permissions = rawEntity
+    ? evaluatePeerPermissions(rawEntity)
+    : { canUpload: true, canDelete: true, isAdmin: false, type: 'user' as const };
+
+  return { peer, rawEntity, permissions };
 }
 
 // Get all user chats, channels, groups, PVs, and bots (including private channels/groups without username)
@@ -1053,6 +1229,9 @@ app.get('/api/telegram/chats', async (req: Request, res: Response) => {
       unreadCount: 0,
       isPrivate: true,
       isArchived: false,
+      canUpload: true,
+      canDelete: true,
+      isAdmin: true,
     });
 
     for (const dialog of allDialogs) {
@@ -1094,7 +1273,7 @@ app.get('/api/telegram/chats', async (req: Request, res: Response) => {
       if (username) {
         cacheKeys.push(`@${username}`, username);
       }
-      cachePeerEntityForUser(currentUid, cacheKeys, peerTarget);
+      cachePeerEntityForUser(currentUid, cacheKeys, peerTarget, entity);
 
       let type: string = 'user';
       let title = '';
@@ -1143,6 +1322,8 @@ app.get('/api/telegram/chats', async (req: Request, res: Response) => {
         (dialog as any).archived || (dialog.dialog as any)?.folderId === 1
       );
 
+      const perms = evaluatePeerPermissions(entity, type);
+
       chats.push({
         id: markedId,
         title,
@@ -1151,6 +1332,9 @@ app.get('/api/telegram/chats', async (req: Request, res: Response) => {
         unreadCount: dialog.unreadCount || 0,
         isPrivate: !username,
         isArchived,
+        canUpload: perms.canUpload,
+        canDelete: perms.canDelete,
+        isAdmin: perms.isAdmin,
       });
     }
 
@@ -1176,7 +1360,7 @@ app.get('/api/telegram/chats', async (req: Request, res: Response) => {
 
           const cacheKeys = [uidStr];
           if (username) cacheKeys.push(`@${username}`, username);
-          cachePeerEntityForUser(currentUid, cacheKeys, u);
+          cachePeerEntityForUser(currentUid, cacheKeys, u, u);
 
           const fullName = `${(u as any).firstName || ''} ${(u as any).lastName || ''}`.trim();
           const title =
@@ -1184,14 +1368,20 @@ app.get('/api/telegram/chats', async (req: Request, res: Response) => {
             (username ? `@${username}` : '') ||
             ((u as any).phone ? `+${(u as any).phone}` : `User ${uidStr}`);
 
+          const chatType = (u as any).bot ? 'bot' : 'user';
+          const perms = evaluatePeerPermissions(u, chatType);
+
           chats.push({
             id: uidStr,
             title,
-            type: (u as any).bot ? 'bot' : 'user',
+            type: chatType,
             username,
             unreadCount: 0,
             isPrivate: !username,
             isArchived: false,
+            canUpload: perms.canUpload,
+            canDelete: perms.canDelete,
+            isAdmin: perms.isAdmin,
           });
         }
       }
@@ -1228,30 +1418,11 @@ app.get('/api/telegram/files', async (req: Request, res: Response) => {
     const searchQuery = (req.query.search as string)?.toLowerCase() || '';
     const peerParam = (req.query.peer as string) || 'me';
     const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
-    let peer = getTargetPeer(peerParam, currentUid);
-    // If private chat entity is not yet in cache, warm up dialogs once
-    if (
-      peerParam !== 'me' &&
-      !peerParam.startsWith('@') &&
-      (!userPeerEntityCache.has(currentUid) || !userPeerEntityCache.get(currentUid)?.has(peerParam))
-    ) {
-      try {
-        const warmDialogs = await client.getDialogs({ limit: 300 });
-        for (const d of warmDialogs) {
-          if (!d.entity) continue;
-          const rawId = d.entity.id?.toString();
-          const dId = d.id?.toString();
-          if (rawId || dId) {
-            cachePeerEntityForUser(
-              currentUid,
-              [dId || '', rawId || '', dId ? `-100${rawId}` : '', dId ? `-${rawId}` : ''],
-              d.inputEntity || d.entity
-            );
-          }
-        }
-        peer = getTargetPeer(peerParam, currentUid);
-      } catch {}
-    }
+    const { peer, permissions: peerPermissions } = await resolveTargetPeerAndEntity(
+      client,
+      peerParam,
+      currentUid
+    );
 
     const files: any[] = [];
     const seenIds = new Set<number>();
@@ -1397,6 +1568,14 @@ app.get('/api/telegram/files', async (req: Request, res: Response) => {
         }
 
         seenIds.add(msg.id);
+        const isOutgoing = Boolean((msg as any).out);
+        const fileCanDelete =
+          peerPermissions.type === 'saved' ||
+          peerPermissions.type === 'bot' ||
+          peerPermissions.type === 'user' ||
+          peerPermissions.isAdmin ||
+          (peerPermissions.canDelete && (isOutgoing || peerPermissions.type === 'group' || peerPermissions.type === 'supergroup'));
+
         files.push({
           id: msg.id,
           filename,
@@ -1410,6 +1589,8 @@ app.get('/api/telegram/files', async (req: Request, res: Response) => {
           width,
           height,
           originPeer: peerParam,
+          canDelete: fileCanDelete,
+          isOutgoing,
           directUrl: `/api/telegram/stream/${msg.id}/${encodeURIComponent(filename)}?peer=${encodeURIComponent(peerParam)}&uid=${encodeURIComponent(currentUid)}`,
           downloadUrl: `/api/telegram/download/${msg.id}/${encodeURIComponent(filename)}?peer=${encodeURIComponent(peerParam)}&uid=${encodeURIComponent(currentUid)}`,
           thumbnailUrl: hasThumb
@@ -1440,6 +1621,7 @@ app.get('/api/telegram/files', async (req: Request, res: Response) => {
       nextOffsetId: hasMore ? currentOffsetId : 0,
       hasMore,
       scannedMessages: totalFetchedMessages,
+      permissions: peerPermissions,
     });
   } catch (err: any) {
     console.error('Error fetching files from Telegram:', err);
@@ -2854,7 +3036,7 @@ app.get(['/api/telegram/transcode/:messageId/:filename?', '/api/telegram/transco
   }
 });
 
-// Delete a message/file from Saved Messages only (Other chats/channels are strictly Read-Only)
+// Delete a message/file from Saved Messages, Bots, PVs, Admin Channels, and Accessible Groups
 app.delete('/api/telegram/file/:messageId', async (req: Request, res: Response) => {
   try {
     const sessionId = getSessionId(req);
@@ -2866,27 +3048,69 @@ app.delete('/api/telegram/file/:messageId', async (req: Request, res: Response) 
     }
 
     const rawPeer = req.query.peer ? String(req.query.peer).trim() : 'me';
-    if (rawPeer !== 'me') {
+    const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
+
+    const { peer: targetPeer, permissions } = await resolveTargetPeerAndEntity(
+      client,
+      rawPeer,
+      currentUid
+    );
+
+    if (!permissions.canDelete) {
       return res.status(403).json({
-        error: 'Read-only mode: Deleting files is only allowed in Saved Messages.',
+        success: false,
+        error: 'شما در این کانال یا گروه دسترسی لازم برای حذف فایل را ندارید.',
       });
     }
 
-    await client.deleteMessages('me', [messageId], { revoke: true });
+    let delRes: any;
+    try {
+      delRes = await client.deleteMessages(targetPeer, [messageId], { revoke: true });
+    } catch (revokeErr) {
+      // Fallback if revoke=true is not permitted for a specific chat type
+      delRes = await client.deleteMessages(targetPeer, [messageId], { revoke: false });
+    }
+
+    // In supergroups/channels, if user is not an admin and tries to delete someone else's message,
+    // Telegram returns ptsCount === 0 without throwing an exception. Verify actual deletion:
+    if (
+      rawPeer !== 'me' &&
+      (permissions.type === 'supergroup' || permissions.type === 'channel') &&
+      Array.isArray(delRes) &&
+      delRes.length > 0 &&
+      delRes[0]?.ptsCount === 0
+    ) {
+      try {
+        const verifyMsgs = await client.getMessages(targetPeer, { ids: [messageId] });
+        if (verifyMsgs && verifyMsgs[0] && verifyMsgs[0].media) {
+          return res.status(403).json({
+            success: false,
+            error: 'در این گروه/کانال فقط امکان حذف فایل‌های ارسالی خودتان وجود دارد (نیاز به دسترسی ادمین حذف پیام).',
+          });
+        }
+      } catch {}
+    }
 
     // Invalidate thumbnail cache
-    const currentUid = activeSessions.get(sessionId)?.user?.id || sessionId;
+    thumbMemoryCache.delete(`${currentUid}_${rawPeer}_${messageId}`);
     thumbMemoryCache.delete(`${currentUid}_me_${messageId}`);
 
-    return res.json({ success: true, message: 'File deleted from Saved Messages' });
+    return res.json({ success: true, message: 'File deleted successfully' });
   } catch (err: any) {
     console.error('Delete error:', err);
-    return res.status(500).json({ error: err.message || 'Failed to delete file' });
+    const msg = (err?.errorMessage || err?.message || '').toString();
+    if (msg.includes('MESSAGE_DELETE_FORBIDDEN') || msg.includes('CHAT_ADMIN_REQUIRED')) {
+      return res.status(403).json({
+        success: false,
+        error: 'شما دسترسی لازم برای حذف این فایل را در تلگرام ندارید.',
+      });
+    }
+    return res.status(500).json({ success: false, error: err.message || 'Failed to delete file' });
   }
 });
 
 // ----------------------------------------------------
-// 5. Zero-Disk In-Memory Upload Strictly to Saved Messages ('me')
+// 5. Zero-Disk Upload to Saved Messages, Bots, PVs, Admin Channels & Accessible Groups
 // ----------------------------------------------------
 app.post('/api/telegram/upload', upload.single('file'), async (req: Request, res: Response) => {
   try {
@@ -2897,10 +3121,18 @@ app.post('/api/telegram/upload', upload.single('file'), async (req: Request, res
       return res.status(401).json({ error: 'Not connected to Telegram' });
     }
 
-    const rawPeer = (req.body.peer || req.query.peer || 'me').toString().trim();
-    if (rawPeer !== 'me') {
+    const rawPeer = (req.body.peer || req.query.peer || 'me').toString().trim() || 'me';
+    const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
+
+    const { peer: targetPeer, permissions } = await resolveTargetPeerAndEntity(
+      client,
+      rawPeer,
+      currentUid
+    );
+
+    if (!permissions.canUpload) {
       return res.status(403).json({
-        error: 'آپلود فایل فقط در سیو مسیج (Saved Messages) مجاز است و سایر کانال‌ها و چت‌ها فقط خواندنی هستند.',
+        error: 'شما در این کانال یا گروه دسترسی ادمین یا مجوز ارسال فایل را ندارید.',
       });
     }
 
@@ -2918,23 +3150,40 @@ app.post('/api/telegram/upload', upload.single('file'), async (req: Request, res
     try {
       const customFile = new CustomFile(originalName, file.size, tempFilePath);
 
-      // Upload strictly to Saved Messages ('me')
-      const uploadedMessage = await client.sendFile('me', {
-        file: customFile,
-        caption: caption || originalName,
-        forceDocument: !file.mimetype.startsWith('image/'),
-        workers: 2,
-      });
+      let uploadedMessage: any;
+      try {
+        uploadedMessage = await client.sendFile(targetPeer, {
+          file: customFile,
+          caption: caption || originalName,
+          forceDocument: !file.mimetype.startsWith('image/'),
+          workers: 2,
+        });
+      } catch (sendErr: any) {
+        const sendErrMsg = (sendErr?.errorMessage || sendErr?.message || '').toString();
+        // If sending as photo is restricted in a group, retry sending as document
+        if (sendErrMsg.includes('CHAT_SEND_PHOTOS_FORBIDDEN') && file.mimetype.startsWith('image/')) {
+          const retryFile = new CustomFile(originalName, file.size, tempFilePath);
+          uploadedMessage = await client.sendFile(targetPeer, {
+            file: retryFile,
+            caption: caption || originalName,
+            forceDocument: true,
+            workers: 2,
+          });
+        } else {
+          throw sendErr;
+        }
+      }
 
-    const msgId = (uploadedMessage as any)?.id || Date.now();
+      const msgId = (uploadedMessage as any)?.id || Date.now();
 
-    return res.json({
+      return res.json({
         success: true,
         messageId: msgId,
         filename: originalName,
         size: file.size,
         mimeType: file.mimetype,
-        message: 'File successfully uploaded to Saved Messages!',
+        peer: rawPeer,
+        message: 'File successfully uploaded!',
       });
     } finally {
       if (tempFilePath) {
@@ -2943,6 +3192,17 @@ app.post('/api/telegram/upload', upload.single('file'), async (req: Request, res
     }
   } catch (err: any) {
     console.error('Upload error:', err);
+    const msg = (err?.errorMessage || err?.message || '').toString();
+    if (
+      msg.includes('CHAT_WRITE_FORBIDDEN') ||
+      msg.includes('CHAT_SEND_MEDIA_FORBIDDEN') ||
+      msg.includes('CHAT_SEND_DOCS_FORBIDDEN') ||
+      msg.includes('CHAT_ADMIN_REQUIRED')
+    ) {
+      return res.status(403).json({
+        error: 'ارسال فایل در این گفتگو یا کانال توسط تلگرام محدود شده است (نیاز به دسترسی ادمین یا مجوز ارسال رسانه).',
+      });
+    }
     return res.status(500).json({ error: err.message || 'Failed to upload file to Telegram' });
   }
 });

@@ -33,15 +33,15 @@ export function FileCard({ file }: { file: TelegramFile }) {
     setActiveDoc,
     setShareModalFile,
     deleteFile,
+    canDeleteFile,
     selectedFileIds,
     isSelectionMode,
     toggleSelectFile,
-    activePeer,
     toggleFavorite,
     isFavorite,
   } = useTelegram();
   const { t, lang } = useTheme();
-  const isSavedMessages = !activePeer || activePeer === 'me';
+  const canDeleteThisFile = activeTab === 'files' && canDeleteFile(file);
 
   const [copied, setCopied] = useState(false);
   const [showMobileActions, setShowMobileActions] = useState(false);
@@ -340,6 +340,20 @@ export function FileCard({ file }: { file: TelegramFile }) {
               >
                 <Share2 className="w-4 h-4 text-indigo-600" />
               </button>
+
+              {canDeleteThisFile && (
+                <button
+                  onClick={handleDelete}
+                  title={confirmDelete ? (lang === 'fa' ? 'تأیید حذف؟' : 'Confirm?') : t('deleteFile')}
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-lg transition active:scale-95 cursor-pointer ${
+                    confirmDelete
+                      ? 'bg-rose-600 text-white hover:bg-rose-500 scale-110'
+                      : 'bg-white/95 text-rose-600 hover:bg-rose-50 hover:scale-110'
+                  }`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -445,7 +459,7 @@ export function FileCard({ file }: { file: TelegramFile }) {
             <span>{isSelected ? (lang === 'fa' ? 'لغو انتخاب' : 'Deselect') : (lang === 'fa' ? 'انتخاب فایل' : 'Select')}</span>
           </button>
 
-          {isSavedMessages && (
+          {canDeleteThisFile && (
             <button
               onClick={handleDelete}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
@@ -558,7 +572,7 @@ export function FileCard({ file }: { file: TelegramFile }) {
                 </span>
               </button>
 
-              {isSavedMessages && (
+              {canDeleteThisFile && (
                 <button
                   onClick={handleDelete}
                   className="col-span-2 flex items-center justify-center gap-2 p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400"

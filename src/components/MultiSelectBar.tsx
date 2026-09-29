@@ -23,11 +23,10 @@ export function MultiSelectBar() {
     selectAllFiltered,
     clearSelection,
     deleteMultipleFiles,
+    canDeleteFile,
     activeAudio,
-    activePeer,
   } = useTelegram();
   const { lang } = useTheme();
-  const isSavedMessages = (!activePeer || activePeer === 'me') && activeTab === 'files';
 
   const [copiedBatch, setCopiedBatch] = useState(false);
   const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
@@ -37,6 +36,11 @@ export function MultiSelectBar() {
 
   const sourceFiles = activeTab === 'favorites' ? favoriteFiles : files;
   const selectedFiles = sourceFiles.filter((f) => selectedFileIds.includes(f.id));
+  const deletableSelectedIds =
+    activeTab === 'files'
+      ? selectedFiles.filter((f) => canDeleteFile(f)).map((f) => f.id)
+      : [];
+  const canBatchDelete = deletableSelectedIds.length > 0;
   const totalSelectedSize = selectedFiles.reduce((acc, f) => acc + f.size, 0);
   const allFilteredSelected =
     filteredFiles.length > 0 &&
@@ -58,6 +62,7 @@ export function MultiSelectBar() {
   };
 
   const handleBatchDelete = async () => {
+    if (deletableSelectedIds.length === 0) return;
     if (!confirmBatchDelete) {
       setConfirmBatchDelete(true);
       if (navigator.vibrate) navigator.vibrate(30);
@@ -66,7 +71,7 @@ export function MultiSelectBar() {
     }
 
     setIsDeleting(true);
-    await deleteMultipleFiles(selectedFileIds);
+    await deleteMultipleFiles(deletableSelectedIds);
     setIsDeleting(false);
     setConfirmBatchDelete(false);
   };
@@ -139,8 +144,8 @@ export function MultiSelectBar() {
             )}
           </button>
 
-          {/* Batch Delete (Strictly in Saved Messages) */}
-          {isSavedMessages && (
+          {/* Batch Delete (Available in Saved Messages, Bots, PVs, Admin Channels, and Accessible Groups) */}
+          {canBatchDelete && (
             <button
               onClick={handleBatchDelete}
               disabled={isDeleting}
@@ -162,8 +167,8 @@ export function MultiSelectBar() {
                     : 'Deleting...'
                   : confirmBatchDelete
                   ? lang === 'fa'
-                    ? 'تأیید حذف؟'
-                    : 'Confirm?'
+                    ? `تأیید حذف (${deletableSelectedIds.length})؟`
+                    : `Confirm (${deletableSelectedIds.length})?`
                   : lang === 'fa'
                   ? 'حذف'
                   : 'Delete'}

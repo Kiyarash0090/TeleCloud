@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   TelegramFile,
+  TelegramChat,
   StorageStats,
   TelegramUser,
   SavedTelegramAccount,
@@ -183,6 +184,7 @@ interface TelegramContextType {
   hasMoreFiles: boolean;
   isLoadingMore: boolean;
   deleteFile: (id: number) => Promise<boolean>;
+  canDeleteFile: (file?: TelegramFile) => boolean;
 
   // Favorites (Global across all chats & channels)
   favoriteFiles: TelegramFile[];
@@ -225,15 +227,21 @@ interface TelegramContextType {
   clearSelection: () => void;
   deleteMultipleFiles: (ids: number[]) => Promise<boolean>;
 
-  // Chat / Channel / Bot Selector
+  // Chat / Channel / Bot Selector & Permissions
   activePeer: string;
   activeChatTitle: string;
-  setActivePeer: (id: string, title: string) => void;
+  canUploadInActiveChat: boolean;
+  canDeleteInActiveChat: boolean;
+  isActiveChatAdmin: boolean;
+  activeChatType: TelegramChat['type'];
+  setActivePeer: (id: string, title: string, chatMeta?: Partial<TelegramChat>) => void;
   isChatSelectorOpen: boolean;
   setIsChatSelectorOpen: (open: boolean) => void;
 
-  // Mobile Back Button & Double-Back-to-Exit
+  // Mobile Back Button, Double-Back-to-Exit & Action Toast
   showExitToast: boolean;
+  actionToast: string | null;
+  actionError: string | null;
   registerBackHandler: (id: string, onBack: () => void) => void;
   unregisterBackHandler: (id: string) => void;
 }
@@ -267,7 +275,21 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
   // Chat / Channel / Bot Selector state
   const [activePeer, setActivePeerState] = useState<string>('me');
   const [activeChatTitle, setActiveChatTitle] = useState<string>('Saved Messages');
+  const [canUploadInActiveChat, setCanUploadInActiveChat] = useState<boolean>(true);
+  const [canDeleteInActiveChat, setCanDeleteInActiveChat] = useState<boolean>(true);
+  const [isActiveChatAdmin, setIsActiveChatAdmin] = useState<boolean>(true);
+  const [activeChatType, setActiveChatType] = useState<TelegramChat['type']>('saved');
   const [isChatSelectorOpen, setIsChatSelectorOpen] = useState(false);
+  const [actionToast, setActionToast] = useState<string | null>(null);
+  const actionToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showActionToast = useCallback((msg: string) => {
+    setActionToast(msg);
+    if (actionToastTimerRef.current) clearTimeout(actionToastTimerRef.current);
+    actionToastTimerRef.current = setTimeout(() => {
+      setActionToast(null);
+    }, 3500);
+  }, []);
 
   // File data, in-memory channel cache & pagination
   const [files, setFiles] = useState<TelegramFile[]>([]);
@@ -286,6 +308,24 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         nextOffsetId: number;
         hasMore: boolean;
         timestamp: number;
+        permissions?: {
+          canUpload: boolean;
+          canDelete: boolean;
+          isAdmin: boolean;
+          type: TelegramChat['type'];
+        };
+      }
+    >
+  >(new Map());
+
+  const peerPermissionsMapRef = useRef<
+    Map<
+      string,
+      {
+        canUpload: boolean;
+        canDelete: boolean;
+        isAdmin: boolean;
+        type: TelegramChat['type'];
       }
     >
   >(new Map());
@@ -625,14 +665,59 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   };
 
-  const setActivePeer = useCallback((id: string, title: string) => {
-    setActivePeerState(id);
-    setActiveChatTitle(title);
-    setSelectedFileIds([]);
-    if (id && id !== 'me') {
-      setIsUploadModalOpen(false);
-    }
-  }, []);
+  const setActivePeer = useCallback(
+    (id: string, title: string, chatMeta?: Partial<TelegramChat>) => {
+      const targetId = id || 'me';
+      setActivePeerState(targetId);
+      setActiveChatTitle(title || 'Saved Messages');
+      setSelectedFileIds([]);
+
+      if (targetId === 'me' || targetId === 'self') {
+        setCanUploadInActiveChat(true);
+        setCanDeleteInActiveChat(true);
+        setIsActiveChatAdmin(true);
+        setActiveChatType('saved');
+        return;
+      }
+
+      if (chatMeta) {
+        const cType = chatMeta.type || 'user';
+        const cUpload =
+          chatMeta.canUpload !== undefined
+            ? chatMeta.canUpload
+            : cType === 'saved' || cType === 'bot' || cType === 'user' || cType === 'group' || cType === 'supergroup';
+        const cDelete =
+          chatMeta.canDelete !== undefined
+            ? chatMeta.canDelete
+            : cUpload;
+        const cAdmin = Boolean(chatMeta.isAdmin);
+
+        setCanUploadInActiveChat(cUpload);
+        setCanDeleteInActiveChat(cDelete);
+        setIsActiveChatAdmin(cAdmin);
+        setActiveChatType(cType);
+        peerPermissionsMapRef.current.set(targetId, {
+          canUpload: cUpload,
+          canDelete: cDelete,
+          isAdmin: cAdmin,
+          type: cType,
+        });
+        if (!cUpload) {
+          setIsUploadModalOpen(false);
+        }
+      } else if (peerPermissionsMapRef.current.has(targetId)) {
+        const cachedPerms = peerPermissionsMapRef.current.get(targetId)!;
+        setCanUploadInActiveChat(cachedPerms.canUpload);
+        setCanDeleteInActiveChat(cachedPerms.canDelete);
+        setIsActiveChatAdmin(cachedPerms.isAdmin);
+        setActiveChatType(cachedPerms.type);
+        if (!cachedPerms.canUpload) {
+          setIsUploadModalOpen(false);
+        }
+      }
+    },
+    []
+  );
 
   // Fetch initial batch of files from real Telegram or In-Memory Channel Cache
   const refreshFiles = useCallback(
@@ -642,7 +727,18 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
       setIsLoadingMore(false);
 
       if (isDemoMode) {
-        setFiles(DEMO_FILES);
+        const isReadOnlyDemoChannel = activePeer === '-1001548293849';
+        const demoCanUpload = !isReadOnlyDemoChannel;
+        const demoCanDelete = !isReadOnlyDemoChannel;
+        setCanUploadInActiveChat(demoCanUpload);
+        setCanDeleteInActiveChat(demoCanDelete);
+        setIsActiveChatAdmin(activePeer === 'me' || activePeer === '-1001928374650' || activePeer === '-948271625');
+        setFiles(
+          DEMO_FILES.map((f) => ({
+            ...f,
+            canDelete: demoCanDelete,
+          }))
+        );
         setHasMoreFiles(false);
         setIsLoading(false);
         return;
@@ -663,6 +759,12 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         setFiles(cached.files);
         nextOffsetIdRef.current = cached.nextOffsetId;
         setHasMoreFiles(cached.hasMore);
+        if (cached.permissions) {
+          setCanUploadInActiveChat(cached.permissions.canUpload);
+          setCanDeleteInActiveChat(cached.permissions.canDelete);
+          setIsActiveChatAdmin(cached.permissions.isAdmin);
+          setActiveChatType(cached.permissions.type);
+        }
         setIsLoading(false);
         return;
       }
@@ -680,6 +782,26 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         if (filesRes.ok) {
           const filesData = await filesRes.json();
           if (filesData.success) {
+            const perms = filesData.permissions as
+              | {
+                  canUpload: boolean;
+                  canDelete: boolean;
+                  isAdmin: boolean;
+                  type: TelegramChat['type'];
+                }
+              | undefined;
+
+            if (perms) {
+              setCanUploadInActiveChat(perms.canUpload);
+              setCanDeleteInActiveChat(perms.canDelete);
+              setIsActiveChatAdmin(perms.isAdmin);
+              setActiveChatType(perms.type);
+              peerPermissionsMapRef.current.set(activePeer || 'me', perms);
+              if (!perms.canUpload) {
+                setIsUploadModalOpen(false);
+              }
+            }
+
             const rawIncoming: TelegramFile[] = filesData.files || [];
             const incoming: TelegramFile[] = rawIncoming.map((f) =>
               normalizeFavoriteFile(
@@ -701,6 +823,7 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
               nextOffsetId: nextOffset,
               hasMore: more,
               timestamp: Date.now(),
+              permissions: perms,
             });
           }
         }
@@ -1182,32 +1305,64 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
     setFiles([]);
   };
 
+  const canDeleteFile = useCallback(
+    (file?: TelegramFile): boolean => {
+      if (file && file.canDelete !== undefined) {
+        return file.canDelete;
+      }
+      return canDeleteInActiveChat;
+    },
+    [canDeleteInActiveChat]
+  );
+
   const deleteFile = async (id: number): Promise<boolean> => {
-    if (activePeer && activePeer !== 'me') {
+    const targetFile =
+      files.find((f) => f.id === id) || favoriteFiles.find((f) => f.id === id);
+    const effectivePeer = targetFile
+      ? resolveFilePeer(targetFile, activePeer || 'me')
+      : activePeer || 'me';
+
+    if (activeTab !== 'favorites' && !canDeleteInActiveChat) {
       return false;
     }
 
     if (isDemoMode) {
-      setFiles(prev => prev.filter(f => f.id !== id));
-      setSelectedFileIds(prev => prev.filter(fid => fid !== id));
+      setFiles((prev) => prev.filter((f) => f.id !== id));
+      setSelectedFileIds((prev) => prev.filter((fid) => fid !== id));
       return true;
     }
 
     try {
-      const res = await fetch(`/api/telegram/file/${id}?peer=${encodeURIComponent(activePeer || 'me')}`, { method: 'DELETE' });
+      const res = await fetch(
+        `/api/telegram/file/${id}?peer=${encodeURIComponent(effectivePeer)}`,
+        { method: 'DELETE' }
+      );
       const data = await res.json();
       if (data.success) {
-        setFiles(prev => prev.filter(f => f.id !== id));
-        setSelectedFileIds(prev => prev.filter(fid => fid !== id));
-        const cacheKey = getCacheKey();
+        setFiles((prev) => prev.filter((f) => f.id !== id));
+        setSelectedFileIds((prev) => prev.filter((fid) => fid !== id));
+        setFavoriteFiles((prev) => {
+          const next = prev.filter(
+            (f) => !(f.id === id && resolveFilePeer(f) === effectivePeer)
+          );
+          try {
+            localStorage.setItem('telecloud_favorite_items', JSON.stringify(next));
+            localStorage.setItem('telecloud_favorites', JSON.stringify(next.map((f) => f.id)));
+          } catch {}
+          return next;
+        });
+        const cacheKey = getCacheKey(effectivePeer);
         if (channelCacheRef.current.has(cacheKey)) {
           const c = channelCacheRef.current.get(cacheKey)!;
           channelCacheRef.current.set(cacheKey, {
             ...c,
-            files: c.files.filter(f => f.id !== id),
+            files: c.files.filter((f) => f.id !== id),
           });
         }
         return true;
+      }
+      if (data.error) {
+        showActionToast(data.error);
       }
       return false;
     } catch {
@@ -1216,8 +1371,8 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleSelectFile = useCallback((id: number) => {
-    setSelectedFileIds(prev =>
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    setSelectedFileIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   }, []);
 
@@ -1226,23 +1381,36 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const deleteMultipleFiles = async (ids: number[]): Promise<boolean> => {
-    if (activePeer && activePeer !== 'me') {
+    if (activeTab !== 'favorites' && !canDeleteInActiveChat) {
       return false;
     }
     if (ids.length === 0) return true;
     if (isDemoMode) {
       const idSet = new Set(ids);
-      setFiles(prev => prev.filter(f => !idSet.has(f.id)));
-      setSelectedFileIds(prev => prev.filter(id => !idSet.has(id)));
+      setFiles((prev) => prev.filter((f) => !idSet.has(f.id)));
+      setSelectedFileIds((prev) => prev.filter((id) => !idSet.has(id)));
       return true;
     }
 
     try {
+      let lastErrorMsg = '';
       const results = await Promise.all(
         ids.map(async (id) => {
           try {
-            const res = await fetch(`/api/telegram/file/${id}?peer=${encodeURIComponent(activePeer || 'me')}`, { method: 'DELETE' });
+            const targetFile =
+              files.find((f) => f.id === id) || favoriteFiles.find((f) => f.id === id);
+            const effectivePeer = targetFile
+              ? resolveFilePeer(targetFile, activePeer || 'me')
+              : activePeer || 'me';
+
+            const res = await fetch(
+              `/api/telegram/file/${id}?peer=${encodeURIComponent(effectivePeer)}`,
+              { method: 'DELETE' }
+            );
             const data = await res.json();
+            if (!data.success && data.error) {
+              lastErrorMsg = data.error;
+            }
             return data.success ? id : null;
           } catch {
             return null;
@@ -1251,17 +1419,23 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
       );
       const deletedIds = new Set(results.filter((id): id is number => id !== null));
       if (deletedIds.size > 0) {
-        setFiles(prev => prev.filter(f => !deletedIds.has(f.id)));
-        setSelectedFileIds(prev => prev.filter(id => !deletedIds.has(id)));
+        setFiles((prev) => prev.filter((f) => !deletedIds.has(f.id)));
+        setSelectedFileIds((prev) => prev.filter((id) => !deletedIds.has(id)));
         const cacheKey = getCacheKey();
         if (channelCacheRef.current.has(cacheKey)) {
           const c = channelCacheRef.current.get(cacheKey)!;
           channelCacheRef.current.set(cacheKey, {
             ...c,
-            files: c.files.filter(f => !deletedIds.has(f.id)),
+            files: c.files.filter((f) => !deletedIds.has(f.id)),
           });
         }
+        if (deletedIds.size < ids.length && lastErrorMsg) {
+          showActionToast(lastErrorMsg);
+        }
         return true;
+      }
+      if (lastErrorMsg) {
+        showActionToast(lastErrorMsg);
       }
       return false;
     } catch {
@@ -1677,6 +1851,7 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         hasMoreFiles,
         isLoadingMore,
         deleteFile,
+        canDeleteFile,
         favoriteFiles,
         favoriteFileIds,
         toggleFavorite,
@@ -1712,10 +1887,16 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         deleteMultipleFiles,
         activePeer,
         activeChatTitle,
+        canUploadInActiveChat,
+        canDeleteInActiveChat,
+        isActiveChatAdmin,
+        activeChatType,
         setActivePeer,
         isChatSelectorOpen,
         setIsChatSelectorOpen,
         showExitToast,
+        actionToast,
+        actionError: actionToast,
         registerBackHandler,
         unregisterBackHandler,
       }}

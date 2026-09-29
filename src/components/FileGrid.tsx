@@ -7,8 +7,7 @@ import { useTelegram } from '../context/TelegramContext';
 
 export function FileGrid({ files }: { files: TelegramFile[] }) {
   const { t } = useTheme();
-  const { activeTab, setIsUploadModalOpen, activePeer } = useTelegram();
-  const isSavedMessages = !activePeer || activePeer === 'me';
+  const { activeTab, setIsUploadModalOpen, canUploadInActiveChat } = useTelegram();
 
   if (files.length === 0) {
     if (activeTab === 'favorites') {
@@ -38,7 +37,7 @@ export function FileGrid({ files }: { files: TelegramFile[] }) {
         <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mb-5">
           {t('noFilesDesc')}
         </p>
-        {isSavedMessages && (
+        {canUploadInActiveChat && (
           <button
             onClick={() => setIsUploadModalOpen(true)}
             className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"

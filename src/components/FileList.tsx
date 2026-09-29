@@ -32,22 +32,36 @@ export function FileList({ files }: { files: TelegramFile[] }) {
     setActiveDoc,
     setShareModalFile,
     deleteFile,
+    canDeleteFile,
+    canUploadInActiveChat,
     setIsUploadModalOpen,
     selectedFileIds,
     isSelectionMode,
     toggleSelectFile,
     selectAllFiltered,
-    activePeer,
     toggleFavorite,
     isFavorite,
   } = useTelegram();
   const { t, lang } = useTheme();
   const [copiedId, setCopiedId] = useState<number | null>(null);
-  const isSavedMessages = !activePeer || activePeer === 'me';
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggeredRef = useRef(false);
   const touchStartPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const handleRowDelete = async (e: React.MouseEvent, fileId: number) => {
+    e.stopPropagation();
+    if (confirmDeleteId !== fileId) {
+      setConfirmDeleteId(fileId);
+      setTimeout(() => {
+        setConfirmDeleteId((prev) => (prev === fileId ? null : prev));
+      }, 3000);
+      return;
+    }
+    setConfirmDeleteId(null);
+    await deleteFile(fileId);
+  };
 
   if (files.length === 0) {
     if (activeTab === 'favorites') {
@@ -77,7 +91,7 @@ export function FileList({ files }: { files: TelegramFile[] }) {
         <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mb-5">
           {t('noFilesDesc')}
         </p>
-        {isSavedMessages && (
+        {canUploadInActiveChat && (
           <button
             onClick={() => setIsUploadModalOpen(true)}
             className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
@@ -292,6 +306,19 @@ export function FileList({ files }: { files: TelegramFile[] }) {
                   >
                     <Share2 className="w-4 h-4" />
                   </button>
+                  {activeTab === 'files' && canDeleteFile(file) && (
+                    <button
+                      onClick={(e) => handleRowDelete(e, file.id)}
+                      title={confirmDeleteId === file.id ? (lang === 'fa' ? 'تأیید حذف؟' : 'Confirm?') : t('deleteFile')}
+                      className={`p-2 rounded-xl transition active:scale-90 ${
+                        confirmDeleteId === file.id
+                          ? 'bg-rose-600 text-white'
+                          : 'text-slate-400 hover:text-rose-600'
+                      }`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -453,11 +480,15 @@ export function FileList({ files }: { files: TelegramFile[] }) {
                         <Share2 className="w-4 h-4" />
                       </button>
 
-                      {isSavedMessages && (
+                      {activeTab === 'files' && canDeleteFile(file) && (
                         <button
-                          onClick={() => deleteFile(file.id)}
-                          title={t('deleteFile')}
-                          className="p-2 rounded-xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                          onClick={(e) => handleRowDelete(e, file.id)}
+                          title={confirmDeleteId === file.id ? (lang === 'fa' ? 'تأیید حذف؟' : 'Confirm?') : t('deleteFile')}
+                          className={`p-2 rounded-xl transition cursor-pointer ${
+                            confirmDeleteId === file.id
+                              ? 'bg-rose-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40'
+                          }`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

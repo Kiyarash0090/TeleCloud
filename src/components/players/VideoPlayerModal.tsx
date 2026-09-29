@@ -409,6 +409,7 @@ export function VideoPlayerModal({
   const didSwipeMoveRef = useRef(false);
 
   const controlsTimeoutRef = useRef<any>(null);
+  const lastTouchTimeRef = useRef<number>(0);
 
   // Reset player state when switching to another video file and pause background music
   useEffect(() => {
@@ -463,11 +464,21 @@ export function VideoPlayerModal({
     setShowControls(true);
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     controlsTimeoutRef.current = setTimeout(() => {
-      if (isPlaying && !showQualityMenu && !showSpeedMenu && !isDraggingSeek) {
+      const isCurrentlyPlaying = videoRef.current ? !videoRef.current.paused : isPlaying;
+      if (isCurrentlyPlaying && !showQualityMenu && !showSpeedMenu && !isDraggingSeek) {
         setShowControls(false);
       }
     }, 3200);
   }, [isPlaying, showQualityMenu, showSpeedMenu, isDraggingSeek]);
+
+  useEffect(() => {
+    if (isPlaying && showControls && !showQualityMenu && !showSpeedMenu && !isDraggingSeek) {
+      resetControlsTimeout();
+    }
+    return () => {
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    };
+  }, [isPlaying, showQualityMenu, showSpeedMenu, isDraggingSeek, resetControlsTimeout]);
 
   // Keyboard controls
   useEffect(() => {
@@ -515,6 +526,7 @@ export function VideoPlayerModal({
 
   // Touch Swipe Handlers on Video Area
   const handleVideoTouchStart = (e: React.TouchEvent) => {
+    lastTouchTimeRef.current = Date.now();
     if (e.touches.length !== 1) return;
     const touch = e.touches[0];
     setIsSwiping(true);
@@ -554,6 +566,7 @@ export function VideoPlayerModal({
   };
 
   const handleVideoTouchEnd = () => {
+    lastTouchTimeRef.current = Date.now();
     if (!isSwiping) return;
     const elapsed = Math.max(1, Date.now() - touchStartRef.current.time);
     const velocityX = Math.abs(swipeDelta.x) / elapsed;
@@ -1099,8 +1112,16 @@ export function VideoPlayerModal({
     <div 
       ref={containerRef}
       style={{ backgroundColor: `rgba(0, 0, 0, ${backdropOpacity})` }}
-      onMouseMove={resetControlsTimeout}
-      onClick={resetControlsTimeout}
+      onTouchStart={() => {
+        lastTouchTimeRef.current = Date.now();
+      }}
+      onTouchEnd={() => {
+        lastTouchTimeRef.current = Date.now();
+      }}
+      onMouseMove={() => {
+        if (Date.now() - lastTouchTimeRef.current < 800) return;
+        resetControlsTimeout();
+      }}
       className="fixed inset-0 z-50 flex flex-col justify-between select-none overflow-hidden font-sans group transition-colors backdrop-blur-2xl"
     >
       {/* Mobile Pull-Down Handle Indicator */}
@@ -1120,7 +1141,18 @@ export function VideoPlayerModal({
             didSwipeMoveRef.current = false;
             return;
           }
-          togglePlay();
+          if (showQualityMenu || showSpeedMenu) {
+            setShowQualityMenu(false);
+            setShowSpeedMenu(false);
+            resetControlsTimeout();
+            return;
+          }
+          if (!showControls) {
+            resetControlsTimeout();
+          } else {
+            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+            setShowControls(false);
+          }
         }}
         onDoubleClick={(e) => {
           e.stopPropagation();
@@ -1139,6 +1171,7 @@ export function VideoPlayerModal({
             onClick={(e) => {
               e.stopPropagation();
               handlePrevVideo();
+              resetControlsTimeout();
             }}
             className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-zinc-950/60 hover:bg-zinc-900/80 text-white backdrop-blur-2xl border border-white/15 items-center justify-center transition shadow-2xl hover:scale-110 active:scale-95 ring-1 ring-white/10"
             title={lang === 'fa' ? 'ویدیوی قبلی' : 'Previous Video'}
@@ -1153,6 +1186,7 @@ export function VideoPlayerModal({
             onClick={(e) => {
               e.stopPropagation();
               handleNextVideo();
+              resetControlsTimeout();
             }}
             className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-zinc-950/60 hover:bg-zinc-900/80 text-white backdrop-blur-2xl border border-white/15 items-center justify-center transition shadow-2xl hover:scale-110 active:scale-95 ring-1 ring-white/10"
             title={lang === 'fa' ? 'ویدیوی بعدی' : 'Next Video'}
@@ -1189,7 +1223,7 @@ export function VideoPlayerModal({
             }}
             onPause={() => setIsPlaying(false)}
             onEnded={() => setIsPlaying(false)}
-            className="max-h-full max-w-full object-contain pointer-events-auto"
+            className="max-h-full max-w-full object-contain pointer-events-none"
           />
         </div>
 
@@ -1210,11 +1244,64 @@ export function VideoPlayerModal({
           </div>
         )}
 
-        {/* Big Center Play/Pause Indicator (when paused) */}
-        {!isPlaying && !isTranscodingLoading && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-            <div className="w-20 h-20 rounded-full bg-black/50 backdrop-blur-2xl border border-white/25 text-white flex items-center justify-center shadow-2xl transition-transform transform scale-100 hover:scale-110 ring-1 ring-white/10">
-              <Play className="w-9 h-9 fill-white ml-1 text-white" />
+        {/* Interactive Center Play/Pause & Skip Controls (Only active when controls are visible) */}
+        {!isTranscodingLoading && (
+          <div
+            className={`absolute inset-0 flex items-center justify-center pointer-events-none z-20 transition-all duration-300 ${
+              showControls ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
+            }`}
+          >
+            <div className="flex items-center gap-6 sm:gap-8">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!showControls) return;
+                  skipTime(-10);
+                  resetControlsTimeout();
+                }}
+                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-2xl border border-white/20 text-white flex items-center justify-center shadow-2xl transition-all active:scale-90 ring-1 ring-white/10 cursor-pointer ${
+                  showControls ? 'pointer-events-auto' : 'pointer-events-none'
+                }`}
+                title="۱۰ ثانیه به عقب"
+              >
+                <RotateCcw className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!showControls) return;
+                  togglePlay();
+                }}
+                className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-black/55 hover:bg-black/75 backdrop-blur-2xl border border-white/25 text-white flex items-center justify-center shadow-2xl transition-all hover:scale-105 active:scale-95 ring-1 ring-white/10 cursor-pointer ${
+                  showControls ? 'pointer-events-auto' : 'pointer-events-none'
+                }`}
+                title={isPlaying ? 'توقف' : 'پخش'}
+              >
+                {isPlaying ? (
+                  <Pause className="w-8 h-8 sm:w-9 sm:h-9 fill-white text-white" />
+                ) : (
+                  <Play className="w-8 h-8 sm:w-9 sm:h-9 fill-white ml-1 text-white" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!showControls) return;
+                  skipTime(10);
+                  resetControlsTimeout();
+                }}
+                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-2xl border border-white/20 text-white flex items-center justify-center shadow-2xl transition-all active:scale-90 ring-1 ring-white/10 cursor-pointer ${
+                  showControls ? 'pointer-events-auto' : 'pointer-events-none'
+                }`}
+                title="۱۰ ثانیه به جلو"
+              >
+                <RotateCw className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
             </div>
           </div>
         )}
@@ -1240,7 +1327,10 @@ export function VideoPlayerModal({
         className={`absolute top-0 inset-x-0 p-3 sm:p-5 pt-[max(0.75rem,env(safe-area-inset-top))] bg-gradient-to-b from-black/85 via-black/40 to-transparent backdrop-blur-[2px] flex items-center justify-between gap-2 text-white z-40 transition-all duration-300 ${
           showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
         }`}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          resetControlsTimeout();
+        }}
       >
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500/20 to-orange-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30 shadow-inner backdrop-blur-md">
@@ -1336,7 +1426,10 @@ export function VideoPlayerModal({
         className={`absolute bottom-0 inset-x-0 p-2.5 sm:p-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-40 transition-all duration-300 ${
           showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
         }`}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          resetControlsTimeout();
+        }}
       >
         <div className="bg-zinc-950/65 dark:bg-zinc-950/70 backdrop-blur-2xl backdrop-saturate-150 border border-white/15 rounded-2xl sm:rounded-3xl p-2.5 sm:px-5 sm:py-3.5 shadow-[0_16px_50px_rgba(0,0,0,0.6)] ring-1 ring-white/10 flex flex-col gap-2 max-w-5xl mx-auto">
           

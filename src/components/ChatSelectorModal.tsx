@@ -21,13 +21,13 @@ export const ChatSelectorModal: React.FC<ChatSelectorModalProps> = ({ onClose })
   const fetchChats = useCallback(async (forceRefresh = false) => {
     if (isDemoMode) {
       setChats([
-        { id: 'me', title: lang === 'fa' ? 'پیام‌های ذخیره‌شده (Saved Messages)' : 'Saved Messages', type: 'saved', username: 'me', isPrivate: true },
-        { id: '-1001548293849', title: lang === 'fa' ? 'کانال فیلم و سریال (Movies Channel)' : 'Movies & Media Channel', type: 'channel', username: 'telecloud_movies', isPrivate: false },
-        { id: '-1001928374650', title: lang === 'fa' ? 'کانال خصوصی پروژه (Private VIP)' : 'Private Project Channel', type: 'channel', username: '', isPrivate: true },
-        { id: '-948271625', title: lang === 'fa' ? 'گروه خصوصی تیم (Team Group)' : 'Private Team Group', type: 'group', username: '', isPrivate: true },
-        { id: '-1001847592038', title: lang === 'fa' ? 'آرشیو موزیک (Music Vault)' : 'Music Archive Bot Vault', type: 'bot', username: 'music_bot', isPrivate: false },
-        { id: '184920491', title: lang === 'fa' ? 'گفتگوی شخصی (John Doe)' : 'John Doe (PV)', type: 'user', username: 'johndoe', isPrivate: false },
-        { id: '294817263', title: lang === 'fa' ? 'علی محمدی (پی‌وی بدون آیدی)' : 'Ali Mohammadi (Private PV)', type: 'user', username: '', isPrivate: true },
+        { id: 'me', title: lang === 'fa' ? 'پیام‌های ذخیره‌شده (Saved Messages)' : 'Saved Messages', type: 'saved', username: 'me', isPrivate: true, canUpload: true, canDelete: true, isAdmin: true },
+        { id: '-1001548293849', title: lang === 'fa' ? 'کانال فیلم و سریال (Movies Channel)' : 'Movies & Media Channel', type: 'channel', username: 'telecloud_movies', isPrivate: false, canUpload: false, canDelete: false, isAdmin: false },
+        { id: '-1001928374650', title: lang === 'fa' ? 'کانال خصوصی پروژه (Private VIP)' : 'Private Project Channel', type: 'channel', username: '', isPrivate: true, canUpload: true, canDelete: true, isAdmin: true },
+        { id: '-948271625', title: lang === 'fa' ? 'گروه خصوصی تیم (Team Group)' : 'Private Team Group', type: 'group', username: '', isPrivate: true, canUpload: true, canDelete: true, isAdmin: true },
+        { id: '-1001847592038', title: lang === 'fa' ? 'آرشیو موزیک (Music Vault)' : 'Music Archive Bot Vault', type: 'bot', username: 'music_bot', isPrivate: false, canUpload: true, canDelete: true, isAdmin: false },
+        { id: '184920491', title: lang === 'fa' ? 'گفتگوی شخصی (John Doe)' : 'John Doe (PV)', type: 'user', username: 'johndoe', isPrivate: false, canUpload: true, canDelete: true, isAdmin: false },
+        { id: '294817263', title: lang === 'fa' ? 'علی محمدی (پی‌وی بدون آیدی)' : 'Ali Mohammadi (Private PV)', type: 'user', username: '', isPrivate: true, canUpload: true, canDelete: true, isAdmin: false },
       ]);
       setIsLoading(false);
       setIsRefreshing(false);
@@ -103,7 +103,7 @@ export const ChatSelectorModal: React.FC<ChatSelectorModalProps> = ({ onClose })
 
   const handleSelectChat = (chat: TelegramChat) => {
     setActiveTab('files');
-    setActivePeer(chat.id, chat.title);
+    setActivePeer(chat.id, chat.title, chat);
     onClose();
   };
 
@@ -342,6 +342,16 @@ export const ChatSelectorModal: React.FC<ChatSelectorModalProps> = ({ onClose })
                           {isPrivateNoUsername && <Lock className="w-2.5 h-2.5" />}
                           <span>{getChatTypeLabel(chat)}</span>
                         </span>
+                        {chat.isAdmin && chat.type !== 'saved' && (
+                          <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.2 rounded font-bold">
+                            {lang === 'fa' ? 'ادمین' : 'Admin'}
+                          </span>
+                        )}
+                        {chat.canUpload === false && (
+                          <span className="text-[10px] bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 px-1.5 py-0.2 rounded font-medium">
+                            {lang === 'fa' ? 'فقط خواندنی' : 'Read-Only'}
+                          </span>
+                        )}
                         {chat.isArchived && (
                           <span className="text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 px-1.5 py-0.2 rounded font-medium inline-flex items-center gap-0.5">
                             <Archive className="w-2.5 h-2.5" />

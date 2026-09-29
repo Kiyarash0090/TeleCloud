@@ -54,6 +54,9 @@ function TeleCloudApp() {
     isAccountDrawerOpen,
     setIsAccountDrawerOpen,
     activePeer,
+    activeChatTitle,
+    canUploadInActiveChat,
+    actionError,
     showExitToast,
     files,
     hasMoreFiles,
@@ -162,6 +165,11 @@ function TeleCloudApp() {
   }, [hasMoreFiles, isLoading, isLoadingMore, loadMoreFiles]);
 
   const isSavedMessages = !activePeer || activePeer === 'me';
+  const targetDisplayTitle = isSavedMessages
+    ? lang === 'fa'
+      ? 'سیو مسیج'
+      : 'Saved Messages'
+    : activeChatTitle || activePeer;
 
   // Register back handlers for top-level modals & mobile drawer
   useBackHandler(isMobileMenuOpen, () => setIsMobileMenuOpen(false));
@@ -170,12 +178,10 @@ function TeleCloudApp() {
   useBackHandler(Boolean(activeDoc), () => setActiveDoc(null));
   useBackHandler(Boolean(shareModalFile), () => setShareModalFile(null));
   useBackHandler(isLoginModalOpen, () => setIsLoginModalOpen(false));
-  useBackHandler(Boolean(isUploadModalOpen && isSavedMessages), () => setIsUploadModalOpen(false));
+  useBackHandler(Boolean(isUploadModalOpen && canUploadInActiveChat), () => setIsUploadModalOpen(false));
   useBackHandler(isChatSelectorOpen, () => setIsChatSelectorOpen(false));
   useBackHandler(isTelegramLinkModalOpen, () => setIsTelegramLinkModalOpen(false));
   useBackHandler(isAccountDrawerOpen, () => setIsAccountDrawerOpen(false));
-
-
 
   if (isWebAuthProtected && !isWebAuthenticated) {
     return <WebAppAuthModal />;
@@ -184,7 +190,7 @@ function TeleCloudApp() {
   const handleWorkspaceDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isSavedMessages) return;
+    if (!canUploadInActiveChat) return;
     dragCounterRef.current += 1;
     if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
       setIsWorkspaceDragging(true);
@@ -199,7 +205,7 @@ function TeleCloudApp() {
   const handleWorkspaceDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isSavedMessages) return;
+    if (!canUploadInActiveChat) return;
     dragCounterRef.current -= 1;
     if (dragCounterRef.current <= 0) {
       dragCounterRef.current = 0;
@@ -212,7 +218,7 @@ function TeleCloudApp() {
     e.stopPropagation();
     dragCounterRef.current = 0;
     setIsWorkspaceDragging(false);
-    if (!isSavedMessages) return;
+    if (!canUploadInActiveChat) return;
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       addFilesToQueue(e.dataTransfer.files);
     }
@@ -279,14 +285,16 @@ function TeleCloudApp() {
               </div>
             </div>
           )}
-          {/* Full Workspace Drag & Drop Active Overlay (Only in Saved Messages) */}
-          {isSavedMessages && isWorkspaceDragging && (
+          {/* Full Workspace Drag & Drop Active Overlay (In any writable chat) */}
+          {canUploadInActiveChat && isWorkspaceDragging && (
             <div className="absolute inset-2 z-50 bg-blue-600/10 dark:bg-blue-500/15 backdrop-blur-md border-4 border-dashed border-blue-500 dark:border-blue-400 rounded-3xl flex flex-col items-center justify-center text-center p-8 transition-all animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
               <div className="w-20 h-20 rounded-3xl bg-blue-600 text-white flex items-center justify-center shadow-2xl shadow-blue-500/40 mb-4 animate-bounce">
                 <UploadCloud className="w-10 h-10" />
               </div>
               <h3 className="text-xl sm:text-2xl font-black text-blue-700 dark:text-blue-300 mb-2">
-                {lang === 'fa' ? 'فایل‌ها را اینجا رها کنید تا به سیو مسیج ارسال شوند' : 'Drop files to upload to Telegram Saved Messages'}
+                {lang === 'fa'
+                  ? `فایل‌ها را اینجا رها کنید تا به «${targetDisplayTitle}» ارسال شوند`
+                  : `Drop files to upload to "${targetDisplayTitle}"`}
               </h3>
               <p className="text-sm text-slate-600 dark:text-zinc-300 max-w-md font-medium">
                 {lang === 'fa' 
@@ -342,8 +350,8 @@ function TeleCloudApp() {
                               ? `در حال دریافت فایل‌های بیشتر... (${files.length} فایل تا اینجا)`
                               : `Loading more files... (${files.length} loaded so far)`
                             : lang === 'fa'
-                            ? `${files.length} فایل نمایش داده شده (فایل‌های قدیمی‌تر در کانال موجود است)`
-                            : `${files.length} files displayed (more available in channel)`}
+                            ? `${files.length} فایل نمایش داده شده (فایل‌های قدیمی‌تر در چت موجود است)`
+                            : `${files.length} files displayed (more available in chat)`}
                         </span>
                       </div>
 
@@ -399,7 +407,7 @@ function TeleCloudApp() {
         <TelegramLoginModal onClose={() => setIsLoginModalOpen(false)} />
       )}
 
-      {isUploadModalOpen && isSavedMessages && (
+      {isUploadModalOpen && canUploadInActiveChat && (
         <UploadModal onClose={() => setIsUploadModalOpen(false)} />
       )}
 
@@ -413,8 +421,14 @@ function TeleCloudApp() {
 
       <AccountSwitcherDrawer />
 
-
-
+      {/* Action / Permission Error Floating Toast */}
+      {actionError && (
+        <div className="fixed bottom-24 md:bottom-10 inset-x-0 z-50 flex justify-center px-4 pointer-events-none animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="bg-rose-600/95 text-white backdrop-blur-xl border border-white/20 px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 text-xs sm:text-sm font-bold max-w-md text-center">
+            <span>{actionError}</span>
+          </div>
+        </div>
+      )}
 
       {/* Double-Back-to-Exit Floating Toast */}
       {showExitToast && (
@@ -434,9 +448,14 @@ function TeleCloudApp() {
 }
 
 function AppWithQueue() {
-  const { refreshFiles, activePeer } = useTelegram();
+  const { refreshFiles, activePeer, activeChatTitle, canUploadInActiveChat } = useTelegram();
   return (
-    <QueueProvider onUploadSuccess={refreshFiles} activePeer={activePeer}>
+    <QueueProvider
+      onUploadSuccess={refreshFiles}
+      activePeer={activePeer}
+      activeChatTitle={activeChatTitle}
+      canUpload={canUploadInActiveChat}
+    >
       <TeleCloudApp />
     </QueueProvider>
   );

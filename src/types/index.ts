@@ -19,6 +19,8 @@ export interface TelegramFile {
   originPeer?: string;
   originChatTitle?: string;
   starredAt?: number;
+  canDelete?: boolean;
+  isOutgoing?: boolean;
 }
 
 export interface TelegramChat {
@@ -29,6 +31,9 @@ export interface TelegramChat {
   unreadCount?: number;
   isPrivate?: boolean;
   isArchived?: boolean;
+  canUpload?: boolean;
+  canDelete?: boolean;
+  isAdmin?: boolean;
 }
 
 export interface StorageCategoryStats {
@@ -88,6 +93,8 @@ export interface UploadQueueItem {
   completedAt?: number;
   error?: string;
   messageId?: number;
+  targetPeer?: string;
+  targetChatTitle?: string;
 }
 
 export type ActiveTab = 'files' | 'account' | 'favorites';

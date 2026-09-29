@@ -48,10 +48,11 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
     isSwitchingAccount,
     switchAccount,
     removeAccount,
-    isConnected,
+        isConnected,
     isDemoMode,
     activePeer,
     activeChatTitle,
+    canUploadInActiveChat,
     setIsChatSelectorOpen,
     favoriteFileIds,
   } = useTelegram();
@@ -405,8 +406,8 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
           <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
         </button>
 
-        {/* Primary Desktop Upload Action (Strictly in Saved Messages) */}
-        {!activePeer || activePeer === 'me' ? (
+        {/* Primary Desktop Upload Action (Available in Saved Messages, Bots, PVs, Admin Channels, and Accessible Groups) */}
+        {canUploadInActiveChat ? (
           <button
             onClick={() => {
               setIsUploadModalOpen(true);
@@ -420,7 +421,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
         ) : (
           <div className="w-full mb-2.5 py-2.5 px-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 text-amber-700 dark:text-amber-300 text-[11px] font-bold flex items-center justify-center gap-2">
             <span>
-              {lang === 'fa' ? 'حالت فقط خواندنی (بدون آپلود)' : 'Read-Only Mode (No Upload)'}
+              {lang === 'fa' ? 'حالت فقط خواندنی (بدون دسترسی آپلود)' : 'Read-Only Mode (No Upload Access)'}
             </span>
           </div>
         )}

@@ -40,6 +40,9 @@ export function ChatQuickSwitcher() {
             type: 'saved',
             username: 'me',
             isPrivate: true,
+            canUpload: true,
+            canDelete: true,
+            isAdmin: true,
           },
           {
             id: '-1001548293849',
@@ -47,6 +50,9 @@ export function ChatQuickSwitcher() {
             type: 'channel',
             username: 'telecloud_movies',
             isPrivate: false,
+            canUpload: false,
+            canDelete: false,
+            isAdmin: false,
           },
           {
             id: '-1001928374650',
@@ -54,6 +60,9 @@ export function ChatQuickSwitcher() {
             type: 'channel',
             username: '',
             isPrivate: true,
+            canUpload: true,
+            canDelete: true,
+            isAdmin: true,
           },
           {
             id: '-948271625',
@@ -61,6 +70,9 @@ export function ChatQuickSwitcher() {
             type: 'group',
             username: '',
             isPrivate: true,
+            canUpload: true,
+            canDelete: true,
+            isAdmin: true,
           },
           {
             id: '-1001847592038',
@@ -68,6 +80,9 @@ export function ChatQuickSwitcher() {
             type: 'bot',
             username: 'music_bot',
             isPrivate: false,
+            canUpload: true,
+            canDelete: true,
+            isAdmin: false,
           },
           {
             id: '184920491',
@@ -75,6 +90,9 @@ export function ChatQuickSwitcher() {
             type: 'user',
             username: 'johndoe',
             isPrivate: false,
+            canUpload: true,
+            canDelete: true,
+            isAdmin: false,
           },
           {
             id: '294817263',
@@ -82,6 +100,9 @@ export function ChatQuickSwitcher() {
             type: 'user',
             username: '',
             isPrivate: true,
+            canUpload: true,
+            canDelete: true,
+            isAdmin: false,
           },
         ]);
         return;
@@ -148,9 +169,9 @@ export function ChatQuickSwitcher() {
     }
   }, [activePeer, quickFilter]);
 
-  const handleSelectChat = (chatId: string, title: string) => {
+  const handleSelectChat = (chat: TelegramChat) => {
     setActiveTab('files');
-    setActivePeer(chatId, title);
+    setActivePeer(chat.id, chat.title, chat);
   };
 
   const filteredChats = React.useMemo(() => {
@@ -269,7 +290,7 @@ export function ChatQuickSwitcher() {
               key={chat.id}
               ref={isSelected ? activeChipRef : null}
               type="button"
-              onClick={() => handleSelectChat(chat.id, chat.title)}
+              onClick={() => handleSelectChat(chat)}
               className={`group flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold shrink-0 transition-all active:scale-95 cursor-pointer border ${
                 isSelected
                   ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white border-transparent shadow-2xs font-bold'
