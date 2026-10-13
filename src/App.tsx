@@ -23,13 +23,14 @@ import { ChatSelectorModal } from './components/ChatSelectorModal';
 import { ChatQuickSwitcher } from './components/ChatQuickSwitcher';
 import { TelegramLinkModal } from './components/TelegramLinkModal';
 import { AccountSwitcherDrawer } from './components/AccountSwitcherDrawer';
-import { RotateCw, UploadCloud, LogOut } from 'lucide-react';
+import { RotateCw, UploadCloud, LogOut, Loader2 } from 'lucide-react';
 
 function TeleCloudApp() {
   const {
     activeTab,
     isWebAuthProtected,
     isWebAuthenticated,
+    isWebAuthLoading,
     isLoading,
     filteredFiles,
     viewMode,
@@ -211,6 +212,17 @@ function TeleCloudApp() {
   useBackHandler(isChatSelectorOpen, () => setIsChatSelectorOpen(false));
   useBackHandler(isTelegramLinkModalOpen, () => setIsTelegramLinkModalOpen(false));
   useBackHandler(isAccountDrawerOpen, () => setIsAccountDrawerOpen(false));
+
+  if (isWebAuthLoading) {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col items-center justify-center p-4">
+        <div className="w-16 h-16 rounded-3xl bg-white/10 backdrop-blur-md flex items-center justify-center mb-4 p-3 border border-white/10 shadow-2xl">
+          <img src="/favicon-96x96.png" alt="Logo" className="w-full h-full object-contain" />
+        </div>
+        <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+      </div>
+    );
+  }
 
   if (isWebAuthProtected && !isWebAuthenticated) {
     return <WebAppAuthModal />;

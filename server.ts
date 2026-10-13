@@ -40,13 +40,74 @@ const upload = multer({
   },
 });
 
-// App configuration from environment
-const APP_USERNAME = process.env.APP_USERNAME || 'admin';
-const APP_PASSWORD = process.env.APP_PASSWORD || 'telecloudpassword123';
-const SESSION_SECRET = process.env.SESSION_SECRET || 'telecloud-secret-2026';
+// Persistent in-app configuration file (zero .env requirement)
+const CONFIG_FILE_PATH = path.join(__dirname, 'app-config.json');
 
-// AES-256-GCM Encryption / Decryption for Remember Me Sessions
-const ENCRYPTION_KEY = crypto.createHash('sha256').update(SESSION_SECRET).digest();
+interface AppConfig {
+  isConfigured: boolean;
+  username: string;
+  passwordHash: string;
+  passwordSalt: string;
+  sessionSecret: string;
+  defaultApiId?: number;
+  defaultApiHash?: string;
+}
+
+function hashPassword(password: string, salt: string): string {
+  return crypto.scryptSync(password, salt, 64).toString('hex');
+}
+
+function loadOrCreateAppConfig(): AppConfig {
+  try {
+    if (fs.existsSync(CONFIG_FILE_PATH)) {
+      const raw = fs.readFileSync(CONFIG_FILE_PATH, 'utf-8');
+      const data = JSON.parse(raw);
+      if (data && typeof data === 'object') {
+        return {
+          isConfigured: Boolean(data.isConfigured),
+          username: data.username || '',
+          passwordHash: data.passwordHash || '',
+          passwordSalt: data.passwordSalt || '',
+          sessionSecret: data.sessionSecret || crypto.randomBytes(32).toString('hex'),
+          defaultApiId: data.defaultApiId || undefined,
+          defaultApiHash: data.defaultApiHash || undefined,
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[TeleCloud] Warning reading app-config.json:', err);
+  }
+
+  // Create fresh configuration requiring first-time in-app setup
+  const freshConfig: AppConfig = {
+    isConfigured: false,
+    username: '',
+    passwordHash: '',
+    passwordSalt: '',
+    sessionSecret: crypto.randomBytes(32).toString('hex'),
+  };
+
+  try {
+    fs.writeFileSync(CONFIG_FILE_PATH, JSON.stringify(freshConfig, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('[TeleCloud] Could not create app-config.json:', err);
+  }
+
+  return freshConfig;
+}
+
+let appConfig: AppConfig = loadOrCreateAppConfig();
+
+function saveAppConfig(): void {
+  try {
+    fs.writeFileSync(CONFIG_FILE_PATH, JSON.stringify(appConfig, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('[TeleCloud] Failed to write app-config.json:', err);
+  }
+}
+
+// AES-256-GCM Encryption / Decryption for Remember Me Sessions (uses persistent appConfig.sessionSecret)
+const ENCRYPTION_KEY = crypto.createHash('sha256').update(appConfig.sessionSecret).digest();
 
 export interface SessionPayload {
   apiId: number;
@@ -384,32 +445,141 @@ function getCategoryFromMimeAndExt(mimeType: string, filename: string): string {
 }
 
 // ----------------------------------------------------
-// 1. Web App Authentication (Configured via .env)
+// 1. Web App Authentication & First-Time Setup (In-App)
 // ----------------------------------------------------
-app.post('/api/auth/web-login', (req: Request, res: Response) => {
-  const { username, password } = req.body;
-  if (!APP_USERNAME || !APP_PASSWORD) {
-    // No credentials required if not configured
-    res.cookie('telecloud_auth', 'authenticated', { httpOnly: true, maxAge: 30 * 24 * 3600 * 1000 });
-    return res.json({ success: true, message: 'Authenticated' });
-  }
-
-  if (username === APP_USERNAME && password === APP_PASSWORD) {
-    res.cookie('telecloud_auth', 'authenticated', { httpOnly: true, maxAge: 30 * 24 * 3600 * 1000 });
-    return res.json({ success: true, message: 'Login successful' });
-  }
-
-  return res.status(401).json({ success: false, error: 'Invalid username or password' });
+app.get('/api/auth/web-status', (req: Request, res: Response) => {
+  const isConfigured = Boolean(appConfig.isConfigured);
+  const isAuthenticated = isConfigured && req.cookies?.telecloud_auth === 'authenticated';
+  res.json({
+    isConfigured,
+    isAuthProtected: true,
+    isAuthenticated,
+    username: isConfigured ? appConfig.username : '',
+    defaultApiId: appConfig.defaultApiId,
+    hasDefaultApiHash: Boolean(appConfig.defaultApiHash),
+  });
 });
 
-app.get('/api/auth/web-status', (req: Request, res: Response) => {
-  const isAuthProtected = Boolean(APP_USERNAME && APP_PASSWORD);
-  const isAuthenticated = !isAuthProtected || req.cookies?.telecloud_auth === 'authenticated';
-  res.json({
-    isAuthProtected,
-    isAuthenticated,
-    defaultApiId: process.env.TELEGRAM_API_ID ? Number(process.env.TELEGRAM_API_ID) : undefined,
-    hasDefaultApiHash: Boolean(process.env.TELEGRAM_API_HASH),
+// First-time setup: Configure master username and password directly in the UI
+app.post('/api/auth/web-setup', (req: Request, res: Response) => {
+  if (appConfig.isConfigured) {
+    return res.status(400).json({ success: false, error: 'برنامه قبلاً راه‌اندازی شده است. لطفاً وارد شوید.' });
+  }
+
+  const { username, password, defaultApiId, defaultApiHash } = req.body;
+  const cleanUsername = (username || '').trim();
+  const cleanPassword = (password || '').trim();
+
+  if (!cleanUsername || cleanUsername.length < 2) {
+    return res.status(400).json({ success: false, error: 'نام کاربری باید حداقل ۲ کاراکتر باشد.' });
+  }
+
+  if (!cleanPassword || cleanPassword.length < 4) {
+    return res.status(400).json({ success: false, error: 'رمز عبور باید حداقل ۴ کاراکتر باشد.' });
+  }
+
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = hashPassword(cleanPassword, salt);
+
+  appConfig.isConfigured = true;
+  appConfig.username = cleanUsername;
+  appConfig.passwordSalt = salt;
+  appConfig.passwordHash = hash;
+
+  if (defaultApiId && !isNaN(Number(defaultApiId))) {
+    appConfig.defaultApiId = Number(defaultApiId);
+  }
+  if (defaultApiHash && typeof defaultApiHash === 'string') {
+    appConfig.defaultApiHash = defaultApiHash.trim();
+  }
+
+  saveAppConfig();
+
+  // Set authenticated cookie immediately on successful setup
+  res.cookie('telecloud_auth', 'authenticated', {
+    httpOnly: true,
+    maxAge: 30 * 24 * 3600 * 1000,
+    sameSite: 'lax',
+  });
+
+  return res.json({
+    success: true,
+    message: 'راه‌اندازی با موفقیت انجام شد.',
+    username: appConfig.username,
+  });
+});
+
+app.post('/api/auth/web-login', (req: Request, res: Response) => {
+  if (!appConfig.isConfigured) {
+    return res.status(400).json({
+      success: false,
+      error: 'برنامه هنوز راه‌اندازی نشده است. لطفاً ابتدا نام کاربری و رمز عبور را در صفحه راه‌اندازی تعیین کنید.',
+      needsSetup: true,
+    });
+  }
+
+  const { username, password } = req.body;
+  const cleanUsername = (username || '').trim();
+  const cleanPassword = (password || '');
+
+  if (!cleanUsername || !cleanPassword) {
+    return res.status(400).json({ success: false, error: 'لطفاً نام کاربری و رمز عبور را وارد کنید.' });
+  }
+
+  if (cleanUsername !== appConfig.username) {
+    return res.status(401).json({ success: false, error: 'نام کاربری یا رمز عبور اشتباه است.' });
+  }
+
+  const computedHash = hashPassword(cleanPassword, appConfig.passwordSalt);
+  if (computedHash !== appConfig.passwordHash) {
+    return res.status(401).json({ success: false, error: 'نام کاربری یا رمز عبور اشتباه است.' });
+  }
+
+  res.cookie('telecloud_auth', 'authenticated', {
+    httpOnly: true,
+    maxAge: 30 * 24 * 3600 * 1000,
+    sameSite: 'lax',
+  });
+  return res.json({ success: true, message: 'ورود موفقیت‌آمیز بود.' });
+});
+
+// Update credentials from inside the application settings
+app.post('/api/auth/web-update-credentials', (req: Request, res: Response) => {
+  if (req.cookies?.telecloud_auth !== 'authenticated') {
+    return res.status(401).json({ success: false, error: 'ابتدا باید وارد برنامه شوید.' });
+  }
+
+  const { currentPassword, newUsername, newPassword, defaultApiId, defaultApiHash } = req.body;
+
+  if (appConfig.isConfigured) {
+    const computedHash = hashPassword(currentPassword || '', appConfig.passwordSalt);
+    if (computedHash !== appConfig.passwordHash) {
+      return res.status(400).json({ success: false, error: 'رمز عبور فعلی نادرست است.' });
+    }
+  }
+
+  if (newUsername && newUsername.trim().length >= 2) {
+    appConfig.username = newUsername.trim();
+  }
+
+  if (newPassword && newPassword.trim().length >= 4) {
+    const newSalt = crypto.randomBytes(16).toString('hex');
+    appConfig.passwordSalt = newSalt;
+    appConfig.passwordHash = hashPassword(newPassword.trim(), newSalt);
+  }
+
+  if (defaultApiId !== undefined) {
+    appConfig.defaultApiId = defaultApiId ? Number(defaultApiId) : undefined;
+  }
+  if (defaultApiHash !== undefined) {
+    appConfig.defaultApiHash = defaultApiHash ? String(defaultApiHash).trim() : undefined;
+  }
+
+  saveAppConfig();
+  return res.json({
+    success: true,
+    message: 'اطلاعات با موفقیت ذخیره شد.',
+    username: appConfig.username,
   });
 });
 
@@ -481,12 +651,12 @@ app.post('/api/telegram/send-code', async (req: Request, res: Response) => {
   try {
     let { apiId, apiHash, phoneNumber } = req.body;
     
-    // Fallback to environment variables if not supplied
-    if (!apiId && process.env.TELEGRAM_API_ID) {
-      apiId = process.env.TELEGRAM_API_ID;
+    // Fallback to configured in-app defaults if not supplied
+    if (!apiId && appConfig.defaultApiId) {
+      apiId = String(appConfig.defaultApiId);
     }
-    if (!apiHash && process.env.TELEGRAM_API_HASH) {
-      apiHash = process.env.TELEGRAM_API_HASH;
+    if (!apiHash && appConfig.defaultApiHash) {
+      apiHash = appConfig.defaultApiHash;
     }
 
     if (!apiId || !apiHash || !phoneNumber) {
@@ -542,6 +712,7 @@ app.post('/api/telegram/send-code', async (req: Request, res: Response) => {
       phoneCodeHash,
       phoneNumber: cleanPhone,
       connectedAt: new Date(),
+      lastActiveAt: Date.now(),
     });
 
     res.cookie('telecloud_sid', sessionId, { httpOnly: true, maxAge: 30 * 24 * 3600 * 1000 });

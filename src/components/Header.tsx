@@ -17,6 +17,7 @@ import {
   Sparkles,
   Link2,
   Star,
+  Lock,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useTelegram, useBackHandler } from '../context/TelegramContext';
@@ -43,6 +44,7 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
     setIsUploadModalOpen,
     setIsTelegramLinkModalOpen,
     canUploadInActiveChat,
+    webLogout,
     filteredFiles,
   } = useTelegram();
 
@@ -246,6 +248,16 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
               <Moon className="w-4 h-4 text-slate-700 dark:text-zinc-200 theme-icon-spring theme-icon-moon animate-in zoom-in-50 spin-in-[-180deg] duration-500" />
             )}
           </div>
+        </button>
+
+        {/* Lock / Master Logout */}
+        <button
+          onClick={webLogout}
+          className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-zinc-800/90 border border-slate-200/80 dark:border-zinc-700/70 text-slate-600 dark:text-zinc-300 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 active:scale-95 transition-all cursor-pointer"
+          title={lang === 'fa' ? 'قفل برنامه و خروج' : 'Lock Application'}
+          aria-label="Lock App"
+        >
+          <Lock className="w-4 h-4" />
         </button>
       </div>
     </header>

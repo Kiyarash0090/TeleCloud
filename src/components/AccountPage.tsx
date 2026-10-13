@@ -27,6 +27,12 @@ import {
   Star,
   CheckCircle2,
   UserPlus,
+  Lock,
+  Key,
+  Shield,
+  Settings,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { useTelegram } from '../context/TelegramContext';
 import { useTheme } from '../context/ThemeContext';
@@ -44,6 +50,11 @@ export function AccountPage() {
     refreshFiles,
     setIsLoginModalOpen,
     connectDemoMode,
+    webAppUsername,
+    webUpdateCredentials,
+    webLogout,
+    serverDefaultApiId,
+    hasServerDefaultApiHash,
   } = useTelegram();
 
   const { t, lang, setLang, isDark, toggleTheme } = useTheme();
@@ -51,6 +62,80 @@ export function AccountPage() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [photoError, setPhotoError] = useState(false);
+
+  // In-app Master Security & Credentials State
+  const [isEditingSecurity, setIsEditingSecurity] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newUsername, setNewUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [editApiId, setEditApiId] = useState(serverDefaultApiId ? String(serverDefaultApiId) : '');
+  const [editApiHash, setEditApiHash] = useState('');
+  const [securityStatus, setSecurityStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isSavingSecurity, setIsSavingSecurity] = useState(false);
+
+  const handleSaveSecurity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSecurityStatus(null);
+
+    if (!currentPassword) {
+      setSecurityStatus({
+        type: 'error',
+        message: lang === 'fa' ? 'لطفاً رمز عبور فعلی خود را وارد کنید.' : 'Please enter your current password.',
+      });
+      return;
+    }
+
+    if (newPassword) {
+      if (newPassword.length < 4) {
+        setSecurityStatus({
+          type: 'error',
+          message: lang === 'fa' ? 'رمز عبور جدید باید حداقل ۴ کاراکتر باشد.' : 'New password must be at least 4 characters.',
+        });
+        return;
+      }
+      if (newPassword !== confirmNewPassword) {
+        setSecurityStatus({
+          type: 'error',
+          message: lang === 'fa' ? 'رمز عبور جدید و تکرار آن یکسان نیستند.' : 'New passwords do not match.',
+        });
+        return;
+      }
+    }
+
+    if (newUsername && newUsername.trim().length < 2) {
+      setSecurityStatus({
+        type: 'error',
+        message: lang === 'fa' ? 'نام کاربری باید حداقل ۲ کاراکتر باشد.' : 'Username must be at least 2 characters.',
+      });
+      return;
+    }
+
+    setIsSavingSecurity(true);
+    const res = await webUpdateCredentials(
+      currentPassword,
+      newUsername.trim() || undefined,
+      newPassword || undefined,
+      editApiId.trim() || undefined,
+      editApiHash.trim() || undefined
+    );
+
+    if (res.success) {
+      setSecurityStatus({
+        type: 'success',
+        message: lang === 'fa' ? 'مشخصات امنیتی با موفقیت بروزرسانی شد.' : 'Credentials updated successfully.',
+      });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } else {
+      setSecurityStatus({
+        type: 'error',
+        message: res.error || (lang === 'fa' ? 'خطا در بروزرسانی اطلاعات.' : 'Failed to update credentials.'),
+      });
+    }
+    setIsSavingSecurity(false);
+  };
 
   useEffect(() => {
     setPhotoError(false);
@@ -490,6 +575,161 @@ export function AccountPage() {
             </span>
           </div>
         </div>
+      </div>
+
+      {/* In-App Master Security & Settings Card */}
+      <div className="p-5 sm:p-6 rounded-3xl bg-white dark:bg-[#1a1b1e] border border-slate-200/80 dark:border-zinc-800/80 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-blue-500/10 text-blue-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <span>{lang === 'fa' ? 'امنیت و گذرواژه ورود به برنامه' : 'Master App Security & Credentials'}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-medium">
+                  {lang === 'fa' ? 'تنظیم درون‌برنامه‌ای' : 'In-App Setup'}
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                {lang === 'fa'
+                  ? `کاربر مدیر: ${webAppUsername || 'admin'} • ذخیره‌سازی امن و مستقیم`
+                  : `Master User: ${webAppUsername || 'admin'} • Secure direct storage`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsEditingSecurity(!isEditingSecurity)}
+              className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-xs font-bold text-slate-700 dark:text-zinc-200 flex items-center justify-center gap-1.5 transition cursor-pointer"
+            >
+              <Key className="w-3.5 h-3.5 text-blue-500" />
+              <span>{isEditingSecurity ? (lang === 'fa' ? 'بستن فرم' : 'Close Form') : t('changePasswordBtn')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={webLogout}
+              className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              title={lang === 'fa' ? 'قفل برنامه و خروج از حساب وب' : 'Lock Application'}
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>{lang === 'fa' ? 'قفل برنامه' : 'Lock App'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Change Credentials & API Config Form */}
+        {isEditingSecurity && (
+          <form onSubmit={handleSaveSecurity} className="pt-3 border-t border-slate-100 dark:border-zinc-800 space-y-3.5 animate-in fade-in duration-200">
+            {securityStatus && (
+              <div
+                className={`p-3 rounded-xl text-xs font-medium text-center ${
+                  securityStatus.type === 'success'
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-300'
+                }`}
+              >
+                {securityStatus.message}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                  {t('currentPasswordLabel')} *
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full h-10 px-3.5 rounded-xl bg-slate-50 hover:bg-white focus:bg-white dark:bg-zinc-800/90 dark:hover:bg-zinc-800 dark:focus:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 outline-none focus:border-blue-500 transition font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                  {t('newUsernameLabel')}
+                </label>
+                <input
+                  type="text"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  placeholder={webAppUsername || 'admin'}
+                  className="w-full h-10 px-3.5 rounded-xl bg-slate-50 hover:bg-white focus:bg-white dark:bg-zinc-800/90 dark:hover:bg-zinc-800 dark:focus:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 outline-none focus:border-blue-500 transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                  {t('newPasswordLabel')}
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full h-10 px-3.5 rounded-xl bg-slate-50 hover:bg-white focus:bg-white dark:bg-zinc-800/90 dark:hover:bg-zinc-800 dark:focus:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 outline-none focus:border-blue-500 transition font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1">
+                  {t('confirmPasswordLabel')}
+                </label>
+                <input
+                  type="password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full h-10 px-3.5 rounded-xl bg-slate-50 hover:bg-white focus:bg-white dark:bg-zinc-800/90 dark:hover:bg-zinc-800 dark:focus:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-xs text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 outline-none focus:border-blue-500 transition font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Optional Telegram Default API configuration */}
+            <div className="pt-2 border-t border-slate-100 dark:border-zinc-800">
+              <span className="text-[11px] font-bold text-slate-600 dark:text-zinc-400 block mb-2">
+                {lang === 'fa' ? 'تنظیمات پیش‌فرض کلیدهای API تلگرام در سرور (اختیاری):' : 'Server Default Telegram API Keys (Optional):'}
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <input
+                    type="text"
+                    value={editApiId}
+                    onChange={(e) => setEditApiId(e.target.value)}
+                    placeholder={serverDefaultApiId ? String(serverDefaultApiId) : 'API ID (e.g. 1234567)'}
+                    className="w-full h-9 px-3 rounded-lg bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-slate-900 dark:text-zinc-100 outline-none focus:border-blue-500 transition"
+                  />
+                </div>
+                <div>
+                  <input
+                    type="text"
+                    value={editApiHash}
+                    onChange={(e) => setEditApiHash(e.target.value)}
+                    placeholder={hasServerDefaultApiHash ? '•••••••••••••••• (ثبت شده)' : 'API Hash (e.g. a1b2c3...)'}
+                    className="w-full h-9 px-3 rounded-lg bg-slate-50 dark:bg-zinc-800/80 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-slate-900 dark:text-zinc-100 outline-none focus:border-blue-500 transition"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={isSavingSecurity}
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
+              >
+                {isSavingSecurity ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                <span>{lang === 'fa' ? 'ذخیره تغییرات درون‌برنامه‌ای' : 'Save In-App Credentials'}</span>
+              </button>
+            </div>
+          </form>
+        )}
       </div>
 
       {/* Preferences / Customization Card */}

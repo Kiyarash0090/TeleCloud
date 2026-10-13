@@ -135,10 +135,17 @@ interface TelegramContextType {
   setActiveTab: (tab: ActiveTab) => void;
 
   // Web app auth
+  isAppConfigured: boolean;
+  webAppUsername: string;
   isWebAuthProtected: boolean;
   isWebAuthenticated: boolean;
+  isWebAuthLoading: boolean;
+  serverDefaultApiId?: number;
+  hasServerDefaultApiHash?: boolean;
   checkWebAuth: () => Promise<void>;
+  webSetup: (username: string, password: string, defaultApiId?: string, defaultApiHash?: string) => Promise<{ success: boolean; error?: string }>;
   webLogin: (u: string, p: string) => Promise<boolean>;
+  webUpdateCredentials: (currentPassword: string, newUsername?: string, newPassword?: string, defaultApiId?: string, defaultApiHash?: string) => Promise<{ success: boolean; error?: string }>;
   webLogout: () => Promise<void>;
 
   // Telegram connection & Multi-Account management
@@ -252,9 +259,14 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
   // Navigation active tab
   const [activeTab, setActiveTab] = useState<ActiveTab>('files');
 
-  // Web app login status
-  const [isWebAuthProtected, setIsWebAuthProtected] = useState(false);
-  const [isWebAuthenticated, setIsWebAuthenticated] = useState(true);
+  // Web app login status & master in-app setup
+  const [isAppConfigured, setIsAppConfigured] = useState(false);
+  const [webAppUsername, setWebAppUsername] = useState('');
+  const [isWebAuthProtected, setIsWebAuthProtected] = useState(true);
+  const [isWebAuthenticated, setIsWebAuthenticated] = useState(false);
+  const [isWebAuthLoading, setIsWebAuthLoading] = useState(true);
+  const [serverDefaultApiId, setServerDefaultApiId] = useState<number | undefined>(undefined);
+  const [hasServerDefaultApiHash, setHasServerDefaultApiHash] = useState(false);
 
   // Telegram account status & Multi-account list
   const [isConnected, setIsConnected] = useState(false);
@@ -631,12 +643,51 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
   // Check Web App Auth Status
   const checkWebAuth = async () => {
     try {
-      const res = await fetch('/api/auth/web-status');
+      const res = await fetch('/api/auth/web-status', { credentials: 'include' });
       const data = await res.json();
-      setIsWebAuthProtected(data.isAuthProtected);
-      setIsWebAuthenticated(data.isAuthenticated);
+      setIsAppConfigured(Boolean(data.isConfigured));
+      setWebAppUsername(data.username || '');
+      setIsWebAuthProtected(Boolean(data.isAuthProtected));
+      setIsWebAuthenticated(Boolean(data.isAuthenticated));
+      if (data.defaultApiId) setServerDefaultApiId(data.defaultApiId);
+      setHasServerDefaultApiHash(Boolean(data.hasDefaultApiHash));
     } catch {
-      setIsWebAuthenticated(true);
+      // In case of error keep existing values
+    } finally {
+      setIsWebAuthLoading(false);
+    }
+  };
+
+  const webSetup = async (
+    username: string,
+    password: string,
+    defaultApiId?: string,
+    defaultApiHash?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch('/api/auth/web-setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          username,
+          password,
+          defaultApiId: defaultApiId ? Number(defaultApiId) : undefined,
+          defaultApiHash: defaultApiHash?.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsAppConfigured(true);
+        setWebAppUsername(data.username || username);
+        setIsWebAuthenticated(true);
+        if (defaultApiId) setServerDefaultApiId(Number(defaultApiId));
+        if (defaultApiHash) setHasServerDefaultApiHash(true);
+        return { success: true };
+      }
+      return { success: false, error: data.error || 'خطا در راه‌اندازی اولیه' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'خطا در ارتباط با سرور' };
     }
   };
 
@@ -645,11 +696,13 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch('/api/auth/web-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
       if (data.success) {
         setIsWebAuthenticated(true);
+        setWebAppUsername(username);
         return true;
       }
       return false;
@@ -658,11 +711,49 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const webUpdateCredentials = async (
+    currentPassword: string,
+    newUsername?: string,
+    newPassword?: string,
+    defaultApiId?: string,
+    defaultApiHash?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch('/api/auth/web-update-credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          currentPassword,
+          newUsername: newUsername?.trim() || undefined,
+          newPassword: newPassword?.trim() || undefined,
+          defaultApiId: defaultApiId ? Number(defaultApiId) : undefined,
+          defaultApiHash: defaultApiHash ? defaultApiHash.trim() : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (newUsername) setWebAppUsername(newUsername.trim());
+        if (defaultApiId) setServerDefaultApiId(Number(defaultApiId));
+        if (defaultApiHash) setHasServerDefaultApiHash(true);
+        return { success: true };
+      }
+      return { success: false, error: data.error || 'خطا در بروزرسانی اطلاعات' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'خطا در ارتباط با سرور' };
+    }
+  };
+
   const webLogout = async () => {
     try {
-      await fetch('/api/auth/web-logout', { method: 'POST' });
+      await fetch('/api/auth/web-logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
       setIsWebAuthenticated(false);
-    } catch {}
+    } catch {
+      setIsWebAuthenticated(false);
+    }
   };
 
   const setActivePeer = useCallback(
@@ -1811,10 +1902,17 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
       value={{
         activeTab,
         setActiveTab,
+        isAppConfigured,
+        webAppUsername,
         isWebAuthProtected,
         isWebAuthenticated,
+        isWebAuthLoading,
+        serverDefaultApiId,
+        hasServerDefaultApiHash,
         checkWebAuth,
+        webSetup,
         webLogin,
+        webUpdateCredentials,
         webLogout,
         isConnected,
         isDemoMode,
