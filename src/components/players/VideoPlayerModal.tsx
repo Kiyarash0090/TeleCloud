@@ -410,6 +410,9 @@ export function VideoPlayerModal({
 
   const controlsTimeoutRef = useRef<any>(null);
   const lastTouchTimeRef = useRef<number>(0);
+  const singleTapTimeoutRef = useRef<any>(null);
+  const lastTapRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
+  const doubleTapFeedbackTimeoutRef = useRef<any>(null);
 
   // Reset player state when switching to another video file and pause background music
   useEffect(() => {
@@ -631,16 +634,21 @@ export function VideoPlayerModal({
     }
   };
 
-  const skipTime = (seconds: number) => {
+  const skipTime = (seconds: number, keepControlsHidden = false) => {
     const effectiveTotal = effectiveDuration || duration || 100;
-    const target = Math.max(0, Math.min(effectiveTotal, currentTime + seconds));
-    performSeek(target);
+    const baseTime =
+      videoRef.current && playbackMode === 'direct' && !isNaN(videoRef.current.currentTime)
+        ? videoRef.current.currentTime
+        : currentTime;
+    const target = Math.max(0, Math.min(effectiveTotal, baseTime + seconds));
+    performSeek(target, keepControlsHidden);
 
     setDoubleTapFeedback(seconds > 0 ? 'right' : 'left');
-    setTimeout(() => setDoubleTapFeedback(null), 650);
+    if (doubleTapFeedbackTimeoutRef.current) clearTimeout(doubleTapFeedbackTimeoutRef.current);
+    doubleTapFeedbackTimeoutRef.current = setTimeout(() => setDoubleTapFeedback(null), 650);
   };
 
-  const performSeek = (targetTime: number) => {
+  const performSeek = (targetTime: number, keepControlsHidden = false) => {
     const effectiveTotal = effectiveDuration || duration || 100;
     const clampedTime = Math.max(0, Math.min(effectiveTotal, targetTime));
     
@@ -659,7 +667,9 @@ export function VideoPlayerModal({
         videoRef.current.currentTime = clampedTime;
       }
     }
-    resetControlsTimeout();
+    if (!keepControlsHidden) {
+      resetControlsTimeout();
+    }
   };
 
   const calculateTimeFromEvent = (e: React.MouseEvent<HTMLDivElement> | MouseEvent | React.TouchEvent<HTMLDivElement> | TouchEvent) => {
@@ -1136,33 +1146,47 @@ export function VideoPlayerModal({
         onTouchMove={handleVideoTouchMove}
         onTouchEnd={handleVideoTouchEnd}
         onTouchCancel={handleVideoTouchEnd}
-        onClick={() => {
+        onClick={(e) => {
           if (didSwipeMoveRef.current) {
             didSwipeMoveRef.current = false;
             return;
           }
-          if (showQualityMenu || showSpeedMenu) {
-            setShowQualityMenu(false);
-            setShowSpeedMenu(false);
-            resetControlsTimeout();
-            return;
-          }
-          if (!showControls) {
-            resetControlsTimeout();
-          } else {
-            if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-            setShowControls(false);
-          }
-        }}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
+          const now = Date.now();
           const rect = e.currentTarget.getBoundingClientRect();
           const clickX = e.clientX - rect.left;
-          if (clickX < rect.width / 2) {
-            skipTime(-10);
-          } else {
-            skipTime(10);
+          const dist = Math.hypot(e.clientX - lastTapRef.current.x, e.clientY - lastTapRef.current.y);
+
+          if (now - lastTapRef.current.time < 280 && dist < 80) {
+            if (singleTapTimeoutRef.current) {
+              clearTimeout(singleTapTimeoutRef.current);
+              singleTapTimeoutRef.current = null;
+            }
+            lastTapRef.current = { time: now, x: e.clientX, y: e.clientY };
+            if (clickX < rect.width / 2) {
+              skipTime(-10, !showControls);
+            } else {
+              skipTime(10, !showControls);
+            }
+            return;
           }
+
+          lastTapRef.current = { time: now, x: e.clientX, y: e.clientY };
+          if (singleTapTimeoutRef.current) clearTimeout(singleTapTimeoutRef.current);
+          singleTapTimeoutRef.current = setTimeout(() => {
+            singleTapTimeoutRef.current = null;
+            if (showQualityMenu || showSpeedMenu) {
+              setShowQualityMenu(false);
+              setShowSpeedMenu(false);
+              resetControlsTimeout();
+              return;
+            }
+            if (!showControls) {
+              resetControlsTimeout();
+            } else {
+              if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+              setShowControls(false);
+            }
+          }, 250);
         }}
       >
         {/* Previous Video Button (Desktop / Controls Visible) */}

@@ -164,6 +164,35 @@ function TeleCloudApp() {
     return () => observer.disconnect();
   }, [hasMoreFiles, isLoading, isLoadingMore, loadMoreFiles]);
 
+  // Hibernate server connection when user leaves tab/window to save server resources
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+          navigator.sendBeacon('/api/telegram/client-idle');
+        } else {
+          fetch('/api/telegram/client-idle', { method: 'POST', keepalive: true }).catch(() => {});
+        }
+      } else if (document.visibilityState === 'visible') {
+        fetch('/api/telegram/client-active', { method: 'POST' }).catch(() => {});
+      }
+    };
+
+    const handlePageHide = () => {
+      if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        navigator.sendBeacon('/api/telegram/client-idle');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, []);
+
   const isSavedMessages = !activePeer || activePeer === 'me';
   const targetDisplayTitle = isSavedMessages
     ? lang === 'fa'

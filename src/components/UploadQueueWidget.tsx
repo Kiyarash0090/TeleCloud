@@ -46,7 +46,23 @@ export const UploadQueueWidget: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleNextPoll = (delay: number) => {
+      if (!isMounted) return;
+      if (pollTimer) clearTimeout(pollTimer);
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+      pollTimer = setTimeout(fetchRemoteTasks, delay);
+    };
+
     const fetchRemoteTasks = async () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+
+      let hasRunningTasks = false;
       try {
         const res = await fetch('/api/telegram/remote-uploads');
         if (res.ok) {
@@ -58,6 +74,7 @@ export const UploadQueueWidget: React.FC = () => {
             const activeOrRecent = data.tasks.filter((t: any) => {
               if (!t || !t.id) return false;
               if (t.status === 'running') {
+                hasRunningTasks = true;
                 dismissedRemoteIdsRef.current.delete(t.id);
                 return true;
               }
@@ -85,13 +102,35 @@ export const UploadQueueWidget: React.FC = () => {
       } catch {
         // ignore fetch error
       }
+
+      if (isMounted) {
+        // 1.5s when active uploads exist; 25s when idle to save server resources
+        scheduleNextPoll(hasRunningTasks ? 1500 : 25000);
+      }
     };
 
-    fetchRemoteTasks();
-    const interval = setInterval(fetchRemoteTasks, 1000);
+    if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+      fetchRemoteTasks();
+    }
+
+    const handleVisibilityChange = () => {
+      if (!isMounted) return;
+      if (document.visibilityState === 'visible') {
+        fetchRemoteTasks();
+      } else {
+        if (pollTimer) {
+          clearTimeout(pollTimer);
+          pollTimer = null;
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       isMounted = false;
-      clearInterval(interval);
+      if (pollTimer) clearTimeout(pollTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [refreshFiles]);
 

@@ -100,6 +100,7 @@ interface ActiveTelegramSession {
     phone?: string;
   };
   connectedAt: Date;
+  lastActiveAt: number;
 }
 
 const activeSessions = new Map<string, ActiveTelegramSession>();
@@ -123,14 +124,170 @@ export interface UploadTask {
 
 const activeUploadQueues = new Map<string, UploadTask[]>();
 
+export interface RemoteTask {
+  id: string;
+  url: string;
+  filename: string;
+  caption: string;
+  totalSize: number;
+  loadedSize: number;
+  progress: number;
+  speed: string;
+  speedBytesPerSec: number;
+  phase: string;
+  status: string;
+  messageId?: number;
+  error?: string;
+  startedAt: number;
+}
+
+const remoteTasksMap = new Map<string, RemoteTask>();
+
+function hasActiveTransfers(): boolean {
+  for (const task of remoteTasksMap.values()) {
+    if (task.status === 'running') return true;
+  }
+  for (const queue of activeUploadQueues.values()) {
+    if (queue.some((t) => t.status === 'uploading' || t.status === 'queued')) return true;
+  }
+  return false;
+}
+
+// 2.5 minutes of inactivity before hibernating MTProto background socket connections
+const IDLE_TIMEOUT_MS = 2.5 * 60 * 1000;
+
 // Helper to get or validate session from cookie or header
 function getSessionId(req: Request): string {
   return (req.cookies?.telecloud_sid as string) || (req.headers['x-telecloud-session'] as string) || 'default_session';
 }
 
-function getActiveClient(sessionId: string): TelegramClient | null {
-  const session = activeSessions.get(sessionId);
+// Middleware: Touch session activity on every incoming request
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  const sid = getSessionId(req);
+  const session = activeSessions.get(sid);
+  if (session) {
+    session.lastActiveAt = Date.now();
+  }
+  next();
+});
+
+// Periodic Idle Connection Reaper: hibernates idle MTProto sockets & cleans caches
+setInterval(async () => {
+  try {
+    const now = Date.now();
+    const hasTransfers = hasActiveTransfers();
+
+    // 1. Hibernate inactive Telegram client sessions
+    for (const [sid, session] of activeSessions.entries()) {
+      if (!session.lastActiveAt) session.lastActiveAt = now;
+      const idleTime = now - session.lastActiveAt;
+
+      if (idleTime > IDLE_TIMEOUT_MS && !hasTransfers) {
+        if (session.client && session.client.connected) {
+          try {
+            console.log(`[TeleCloud] Hibernating idle Telegram connection for session ${sid} (idle ${Math.round(idleTime / 1000)}s) to conserve server CPU & memory`);
+            await session.client.disconnect();
+          } catch (e) {
+            console.warn(`[TeleCloud] Error disconnecting idle client ${sid}:`, e);
+          }
+        }
+      }
+    }
+
+    // 2. Disconnect pooled clients that have no active sessions and are idle
+    for (const [sessStr, client] of clientPool.entries()) {
+      if (client.connected && !hasTransfers) {
+        let isAssociatedWithActiveSession = false;
+        for (const session of activeSessions.values()) {
+          if (session.stringSession === sessStr && session.client.connected) {
+            isAssociatedWithActiveSession = true;
+            break;
+          }
+        }
+        if (!isAssociatedWithActiveSession) {
+          try {
+            await client.disconnect();
+          } catch {}
+        }
+      }
+    }
+
+    // 3. Clean up finished remote tasks older than 5 minutes
+    for (const [id, task] of remoteTasksMap.entries()) {
+      if ((task.status === 'completed' || task.status === 'failed') && task.startedAt && now - task.startedAt > 5 * 60 * 1000) {
+        remoteTasksMap.delete(id);
+      }
+    }
+
+    // 4. Clean up profile photo cache entries older than 30 minutes
+    for (const [uid, cached] of profilePhotoCache.entries()) {
+      if (now - cached.cachedAt > 30 * 60 * 1000) {
+        profilePhotoCache.delete(uid);
+      }
+    }
+  } catch (err) {
+    console.warn('[TeleCloud] Idle reaper error:', err);
+  }
+}, 30000);
+
+async function getActiveClient(sessionId: string, req?: Request): Promise<TelegramClient | null> {
+  let session = activeSessions.get(sessionId);
+
+  // If in-memory session is missing, attempt auto-restore from remember cookie
+  if ((!session || !session.client) && req) {
+    const rememberToken = req.cookies?.telecloud_remember_token;
+    if (rememberToken && typeof rememberToken === 'string') {
+      const payload = decryptSession(rememberToken);
+      if (payload && payload.apiId && payload.apiHash && payload.sessionString) {
+        try {
+          let client = clientPool.get(payload.sessionString);
+          if (!client) {
+            const stringSession = new StringSession(payload.sessionString);
+            client = new TelegramClient(stringSession, payload.apiId, payload.apiHash, { connectionRetries: 3 });
+            await client.connect();
+          } else if (!client.connected) {
+            await client.connect();
+          }
+          if (await client.isUserAuthorized()) {
+            const me = (await client.getMe()) as any;
+            const userData = {
+              id: me.id?.toString() || payload.user?.id || 'me',
+              firstName: me.firstName || payload.user?.firstName || 'Telegram User',
+              lastName: me.lastName || payload.user?.lastName || '',
+              username: me.username || payload.user?.username || '',
+              phone: me.phone || payload.user?.phone || '',
+            };
+            clientPool.set(payload.sessionString, client);
+            if (userData.id) userClientMap.set(userData.id, client);
+            session = {
+              client,
+              apiId: payload.apiId,
+              apiHash: payload.apiHash,
+              stringSession: payload.sessionString,
+              user: userData,
+              connectedAt: new Date(),
+              lastActiveAt: Date.now(),
+            };
+            activeSessions.set(sessionId, session);
+          }
+        } catch (e) {
+          // ignore auto-restore error
+        }
+      }
+    }
+  }
+
   if (session && session.client) {
+    session.lastActiveAt = Date.now();
+    // Transparent on-demand reconnect if client was hibernated
+    if (!session.client.connected) {
+      try {
+        console.log(`[TeleCloud] Reconnecting idle Telegram client for session ${sessionId}...`);
+        await session.client.connect();
+      } catch (connErr) {
+        console.warn(`[TeleCloud] Reconnect error for session ${sessionId}:`, connErr);
+      }
+    }
     return session.client;
   }
   return null;
@@ -487,6 +644,7 @@ app.post('/api/telegram/sign-in', async (req: Request, res: Response) => {
       phone: me.phone || session.phoneNumber,
     };
 
+    session.lastActiveAt = Date.now();
     pendingAuthSessions.delete(sessionId);
     activeSessions.set(sessionId, session);
     clientPool.set(savedString, client);
@@ -576,6 +734,7 @@ app.post('/api/telegram/session-login', async (req: Request, res: Response) => {
       stringSession: cleanSessionStr,
       user: userData,
       connectedAt: new Date(),
+      lastActiveAt: Date.now(),
     });
 
     res.cookie('telecloud_sid', sessionId, { httpOnly: true, maxAge: 30 * 24 * 3600 * 1000 });
@@ -663,6 +822,7 @@ app.post('/api/telegram/restore-session', async (req: Request, res: Response) =>
       stringSession: payload.sessionString,
       user: userData,
       connectedAt: new Date(),
+      lastActiveAt: Date.now(),
     });
 
     res.cookie('telecloud_sid', sessionId, { httpOnly: true, maxAge: 30 * 24 * 3600 * 1000 });
@@ -726,6 +886,7 @@ app.get('/api/telegram/status', async (req: Request, res: Response) => {
               stringSession: payload.sessionString,
               user: userData,
               connectedAt: new Date(),
+              lastActiveAt: Date.now(),
             });
             return res.json({
               connected: true,
@@ -746,6 +907,14 @@ app.get('/api/telegram/status', async (req: Request, res: Response) => {
   }
 
   try {
+    session.lastActiveAt = Date.now();
+    if (!session.client.connected) {
+      try {
+        await session.client.connect();
+      } catch (connErr) {
+        console.warn('Status reconnect error:', connErr);
+      }
+    }
     const isAuthorized = await session.client.isUserAuthorized();
     if (!isAuthorized) {
       activeSessions.delete(sessionId);
@@ -1192,7 +1361,7 @@ async function resolveTargetPeerAndEntity(
 app.get('/api/telegram/chats', async (req: Request, res: Response) => {
   try {
     const sessionId = getSessionId(req);
-    const client = getActiveClient(sessionId);
+    const client = await getActiveClient(sessionId, req);
 
     if (!client) {
       return res.status(401).json({ error: 'Not connected to Telegram' });
@@ -1406,7 +1575,7 @@ app.get('/api/telegram/chats', async (req: Request, res: Response) => {
 app.get('/api/telegram/files', async (req: Request, res: Response) => {
   try {
     const sessionId = getSessionId(req);
-    const client = getActiveClient(sessionId);
+    const client = await getActiveClient(sessionId, req);
 
     if (!client) {
       return res.status(401).json({ error: 'Not connected to Telegram' });
@@ -1633,7 +1802,7 @@ app.get('/api/telegram/files', async (req: Request, res: Response) => {
 app.get('/api/telegram/stats', async (req: Request, res: Response) => {
   try {
     const sessionId = getSessionId(req);
-    const client = getActiveClient(sessionId);
+    const client = await getActiveClient(sessionId, req);
 
     if (!client) {
       return res.status(401).json({ error: 'Not connected to Telegram' });
@@ -1830,7 +1999,7 @@ app.post('/api/telegram/parse-link', async (req: Request, res: Response) => {
     }
 
     const sessionId = getSessionId(req);
-    const client = getActiveClient(sessionId);
+    const client = await getActiveClient(sessionId, req);
     const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
 
     // If client is connected, fetch real message via MTProto
@@ -2020,27 +2189,25 @@ app.post('/api/telegram/parse-link', async (req: Request, res: Response) => {
   }
 });
 
-// ----------------------------------------------------
-// Real-time Remote Transfer: Stream direct URL or Telegram post into Saved Messages ('me')
-// ----------------------------------------------------
-interface RemoteTask {
-  id: string;
-  url: string;
-  filename: string;
-  caption: string;
-  totalSize: number;
-  loadedSize: number;
-  progress: number; // 0..100
-  speed: string;
-  speedBytesPerSec: number;
-  phase: string;
-  status: string;
-  messageId?: number;
-  error?: string;
-  startedAt: number;
-}
+// Client-Side Visibility / Idle Endpoints to hibernate connections when user leaves tab
+app.post('/api/telegram/client-idle', (req: Request, res: Response) => {
+  const sessionId = getSessionId(req);
+  const session = activeSessions.get(sessionId);
+  if (session && !hasActiveTransfers()) {
+    // Accelerate idle expiration so reaper hibernates connection promptly within 10s
+    session.lastActiveAt = Date.now() - (IDLE_TIMEOUT_MS - 10000);
+  }
+  return res.json({ success: true, hibernating: true });
+});
 
-const remoteTasksMap = new Map<string, RemoteTask>();
+app.post('/api/telegram/client-active', (req: Request, res: Response) => {
+  const sessionId = getSessionId(req);
+  const session = activeSessions.get(sessionId);
+  if (session) {
+    session.lastActiveAt = Date.now();
+  }
+  return res.json({ success: true, active: true });
+});
 
 function formatSpeedBytes(bytesPerSec: number): string {
   if (bytesPerSec <= 0) return '0 B/s';
@@ -2123,7 +2290,7 @@ app.post('/api/telegram/start-remote-upload', async (req: Request, res: Response
     remoteTasksMap.set(taskId, task);
 
     const sessionId = getSessionId(req);
-    const client = getActiveClient(sessionId);
+    const client = await getActiveClient(sessionId, req);
     const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
 
     // Run execution in background without blocking response
@@ -2578,7 +2745,7 @@ app.post('/api/telegram/remote-upload', async (req: Request, res: Response) => {
   try {
     const { url, telegramLink, peerParam: bodyPeerParam, messageId: bodyMessageId, filename, caption } = req.body;
     const sessionId = getSessionId(req);
-    const client = getActiveClient(sessionId);
+    const client = await getActiveClient(sessionId, req);
     const currentUid = String(activeSessions.get(sessionId)?.user?.id || sessionId);
 
     let tgSource: { peerParam: string; messageId: number } | null = null;
@@ -2695,7 +2862,7 @@ const thumbMemoryCache = new Map<string, { buffer: Buffer; mime: string; cachedA
 app.get('/api/telegram/thumbnail/:messageId', async (req: Request, res: Response) => {
   try {
     const sessionId = getSessionId(req);
-    const client = getActiveClient(sessionId);
+    const client = await getActiveClient(sessionId, req);
     const messageId = Number(req.params.messageId);
 
     if (!client || isNaN(messageId)) {
@@ -2752,7 +2919,7 @@ app.get('/api/telegram/thumbnail/:messageId', async (req: Request, res: Response
 app.get(['/api/telegram/stream/:messageId/:filename?', '/api/telegram/download/:messageId/:filename?'], async (req: Request, res: Response) => {
   try {
     const sessionId = getSessionId(req);
-    const client = getActiveClient(sessionId);
+    const client = await getActiveClient(sessionId, req);
     const messageId = Number(req.params.messageId);
     const isDownloadRoute = req.path.includes('/download/');
 
@@ -2798,6 +2965,10 @@ app.get(['/api/telegram/stream/:messageId/:filename?', '/api/telegram/download/:
       res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
     }
 
+    let isClientClosed = false;
+    req.on('close', () => { isClientClosed = true; });
+    res.on('close', () => { isClientClosed = true; });
+
     // Handle HTTP Range Requests (Essential for Video/Audio seeking in custom player)
     const rangeHeader = req.headers.range;
 
@@ -2822,7 +2993,7 @@ app.get(['/api/telegram/stream/:messageId/:filename?', '/api/telegram/download/:
         offset: bigInt(alignedStart),
         requestSize: STREAM_CHUNK_SIZE,
       })) {
-        if (res.destroyed || res.writableEnded) break;
+        if (isClientClosed || res.destroyed || res.writableEnded) break;
 
         let chunkData = chunk;
 
@@ -2858,7 +3029,7 @@ app.get(['/api/telegram/stream/:messageId/:filename?', '/api/telegram/download/:
       offset: bigInt(0),
       requestSize: FULL_STREAM_CHUNK_SIZE,
     })) {
-      if (res.destroyed || res.writableEnded) break;
+      if (isClientClosed || res.destroyed || res.writableEnded) break;
       res.write(chunk);
     }
 
@@ -2879,7 +3050,7 @@ app.get(['/api/telegram/transcode/:messageId/:filename?', '/api/telegram/transco
   let ffmpegProcess: any = null;
   try {
     const sessionId = getSessionId(req);
-    const client = getActiveClient(sessionId);
+    const client = await getActiveClient(sessionId, req);
     const messageId = Number(req.params.messageId);
     const startTime = parseFloat(req.query.startTime as string || req.query.t as string || '0') || 0;
     const quality = (req.query.quality as string) || 'auto';
@@ -2984,7 +3155,17 @@ app.get(['/api/telegram/transcode/:messageId/:filename?', '/api/telegram/transco
       }
     });
 
+    let isTranscodeClosed = false;
     req.on('close', () => {
+      isTranscodeClosed = true;
+      if (ffmpegProcess) {
+        try {
+          ffmpegProcess.kill('SIGKILL');
+        } catch {}
+      }
+    });
+    res.on('close', () => {
+      isTranscodeClosed = true;
       if (ffmpegProcess) {
         try {
           ffmpegProcess.kill('SIGKILL');
@@ -3005,7 +3186,7 @@ app.get(['/api/telegram/transcode/:messageId/:filename?', '/api/telegram/transco
           offset: bigInt(0),
           requestSize: 256 * 1024,
         })) {
-          if (ffmpegProcess.stdin.destroyed || res.destroyed || res.writableEnded) {
+          if (isTranscodeClosed || ffmpegProcess.stdin.destroyed || res.destroyed || res.writableEnded) {
             break;
           }
           const canWrite = ffmpegProcess.stdin.write(chunk);
@@ -3040,7 +3221,7 @@ app.get(['/api/telegram/transcode/:messageId/:filename?', '/api/telegram/transco
 app.delete('/api/telegram/file/:messageId', async (req: Request, res: Response) => {
   try {
     const sessionId = getSessionId(req);
-    const client = getActiveClient(sessionId);
+    const client = await getActiveClient(sessionId, req);
     const messageId = Number(req.params.messageId);
 
     if (!client || isNaN(messageId)) {
@@ -3115,7 +3296,7 @@ app.delete('/api/telegram/file/:messageId', async (req: Request, res: Response) 
 app.post('/api/telegram/upload', upload.single('file'), async (req: Request, res: Response) => {
   try {
     const sessionId = getSessionId(req);
-    const client = getActiveClient(sessionId);
+    const client = await getActiveClient(sessionId, req);
 
     if (!client) {
       return res.status(401).json({ error: 'Not connected to Telegram' });
