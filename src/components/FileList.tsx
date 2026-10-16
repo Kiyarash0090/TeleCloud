@@ -16,6 +16,8 @@ import {
   FolderOpen,
   Upload,
   Star,
+  FolderPlus,
+  FolderMinus,
 } from 'lucide-react';
 import { TelegramFile } from '../types';
 import { formatFileSize, formatDate, formatDuration, getFileExtension, getFileColor } from '../utils/formatters';
@@ -41,6 +43,10 @@ export function FileList({ files }: { files: TelegramFile[] }) {
     selectAllFiltered,
     toggleFavorite,
     isFavorite,
+    openAddToFolderModal,
+    activeFolder,
+    setActiveFolderId,
+    removeFilesFromFolder,
   } = useTelegram();
   const { t, lang } = useTheme();
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -76,6 +82,28 @@ export function FileList({ files }: { files: TelegramFile[] }) {
           <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md">
             {t('noFavoritesDesc')}
           </p>
+        </div>
+      );
+    }
+
+    if (activeFolder) {
+      return (
+        <div className="flex flex-col items-center justify-center py-16 sm:py-24 px-4 text-center bg-white/60 dark:bg-[#1e1f20]/60 rounded-3xl border border-dashed border-slate-200 dark:border-zinc-800">
+          <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-500 flex items-center justify-center mb-4">
+            <FolderOpen className="w-8 h-8" />
+          </div>
+          <h3 className="text-sm sm:text-base font-bold text-slate-800 dark:text-zinc-200 mb-1">
+            {t('folderEmpty')}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mb-5">
+            {t('folderEmptyDesc')}
+          </p>
+          <button
+            onClick={() => setActiveFolderId(null)}
+            className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 text-xs font-bold active:scale-95 transition-all cursor-pointer"
+          >
+            {t('exitFolder')}
+          </button>
         </div>
       );
     }

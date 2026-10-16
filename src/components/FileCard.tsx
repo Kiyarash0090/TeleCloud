@@ -17,6 +17,8 @@ import {
   CheckCircle2,
   ExternalLink,
   Star,
+  FolderPlus,
+  FolderMinus,
 } from 'lucide-react';
 import { TelegramFile } from '../types';
 import { formatFileSize, formatDate, formatDuration, getFileExtension, getFileColor } from '../utils/formatters';
@@ -39,6 +41,9 @@ export function FileCard({ file }: { file: TelegramFile }) {
     toggleSelectFile,
     toggleFavorite,
     isFavorite,
+    openAddToFolderModal,
+    activeFolder,
+    removeFilesFromFolder,
   } = useTelegram();
   const { t, lang } = useTheme();
   const canDeleteThisFile = activeTab === 'files' && canDeleteFile(file);
@@ -341,6 +346,17 @@ export function FileCard({ file }: { file: TelegramFile }) {
                 <Share2 className="w-4 h-4 text-indigo-600" />
               </button>
 
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openAddToFolderModal(file);
+                }}
+                title={t('addToFolder')}
+                className="w-9 h-9 rounded-xl bg-white/95 text-slate-900 hover:bg-white hover:scale-110 flex items-center justify-center shadow-lg transition active:scale-95 cursor-pointer"
+              >
+                <FolderPlus className="w-4 h-4 text-blue-600" />
+              </button>
+
               {canDeleteThisFile && (
                 <button
                   onClick={handleDelete}
@@ -445,6 +461,30 @@ export function FileCard({ file }: { file: TelegramFile }) {
             <Star className={`w-3.5 h-3.5 ${isFav ? 'fill-amber-500 text-amber-500' : 'text-amber-500'}`} />
             <span>{isFav ? t('removeFromFavorites') : t('addToFavorites')}</span>
           </button>
+
+          <button
+            onClick={() => {
+              setContextMenuPos(null);
+              openAddToFolderModal(file);
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-700 dark:text-zinc-200 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-sky-400 transition cursor-pointer"
+          >
+            <FolderPlus className="w-3.5 h-3.5" />
+            <span>{t('addToFolder')}</span>
+          </button>
+
+          {activeFolder && (
+            <button
+              onClick={() => {
+                setContextMenuPos(null);
+                removeFilesFromFolder(activeFolder.id, [file.id]);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+            >
+              <FolderMinus className="w-3.5 h-3.5" />
+              <span>{t('removeFromFolder')}</span>
+            </button>
+          )}
 
           <div className="h-[1px] bg-slate-100 dark:bg-zinc-800 my-1" />
 
@@ -558,6 +598,30 @@ export function FileCard({ file }: { file: TelegramFile }) {
                 <Star className={`w-4 h-4 ${isFav ? 'fill-amber-500 text-amber-500' : 'text-amber-500'}`} />
                 <span>{isFav ? t('removeFromFavorites') : t('addToFavorites')}</span>
               </button>
+
+              <button
+                onClick={() => {
+                  setShowMobileActions(false);
+                  openAddToFolderModal(file);
+                }}
+                className="col-span-2 flex items-center justify-center gap-2.5 p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-sky-400 font-semibold"
+              >
+                <FolderPlus className="w-4 h-4" />
+                <span>{t('addToFolder')}</span>
+              </button>
+
+              {activeFolder && (
+                <button
+                  onClick={() => {
+                    setShowMobileActions(false);
+                    removeFilesFromFolder(activeFolder.id, [file.id]);
+                  }}
+                  className="col-span-2 flex items-center justify-center gap-2.5 p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 font-semibold"
+                >
+                  <FolderMinus className="w-4 h-4" />
+                  <span>{t('removeFromFolder')}</span>
+                </button>
+              )}
 
               <button
                 onClick={() => {

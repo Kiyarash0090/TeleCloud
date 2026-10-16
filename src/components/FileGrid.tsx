@@ -7,9 +7,31 @@ import { useTelegram } from '../context/TelegramContext';
 
 export function FileGrid({ files }: { files: TelegramFile[] }) {
   const { t } = useTheme();
-  const { activeTab, setIsUploadModalOpen, canUploadInActiveChat } = useTelegram();
+  const { activeTab, setIsUploadModalOpen, canUploadInActiveChat, activeFolder, setActiveFolderId } = useTelegram();
 
   if (files.length === 0) {
+    if (activeFolder) {
+      return (
+        <div className="flex flex-col items-center justify-center py-16 sm:py-24 px-4 text-center bg-white/50 dark:bg-[#18191d]/50 rounded-3xl border border-dashed border-slate-200 dark:border-zinc-800">
+          <div className="w-16 h-16 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-500 flex items-center justify-center mb-4">
+            <FolderOpen className="w-8 h-8" />
+          </div>
+          <h3 className="text-sm sm:text-base font-bold text-slate-800 dark:text-zinc-200 mb-1">
+            {t('folderEmpty')}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mb-5">
+            {t('folderEmptyDesc')}
+          </p>
+          <button
+            onClick={() => setActiveFolderId(null)}
+            className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 text-xs font-bold active:scale-95 transition-all cursor-pointer"
+          >
+            {t('exitFolder')}
+          </button>
+        </div>
+      );
+    }
+
     if (activeTab === 'favorites') {
       return (
         <div className="flex flex-col items-center justify-center py-16 sm:py-24 px-4 text-center bg-white/50 dark:bg-[#18191d]/50 rounded-3xl border border-dashed border-slate-200 dark:border-zinc-800">

@@ -34,6 +34,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       root.classList.remove('dark');
       localStorage.setItem('telecloud_theme', 'light');
     }
+    const meta = document.getElementById('theme-color-meta');
+    if (meta) {
+      meta.setAttribute('content', isDark ? '#131314' : '#f8fafd');
+    }
   }, [isDark]);
 
   useEffect(() => {

@@ -2,9 +2,18 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TeleCloud - Telegram Cloud Storage & File Manager</title>
     <meta name="description" content="Convert your Telegram Saved Messages into a high-speed, secure Google Drive-style cloud file manager with direct streaming, media players, and zero server disk storage." />
+    
+    <!-- PWA & Mobile Web App Standalone Capabilities -->
+    <meta name="application-name" content="TeleCloud" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="TeleCloud" />
+    <meta name="theme-color" content="#131314" id="theme-color-meta" />
+    
     <meta property="og:title" content="TeleCloud - Telegram Cloud Storage & File Manager" />
     <meta property="og:description" content="Convert your Telegram Saved Messages into a high-speed, secure Google Drive-style cloud file manager with direct streaming, media players, and zero server disk storage." />
     <meta property="og:type" content="website" />
@@ -14,6 +23,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
+    <link rel="manifest" href="/manifest.json" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Vazirmatn:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -21,10 +31,15 @@
       (function() {
         try {
           var saved = localStorage.getItem('telecloud_theme');
-          if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          var isDark = saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) {
             document.documentElement.classList.add('dark');
           } else {
             document.documentElement.classList.remove('dark');
+          }
+          var meta = document.getElementById('theme-color-meta');
+          if (meta) {
+            meta.setAttribute('content', isDark ? '#131314' : '#f8fafd');
           }
         } catch (e) {}
       })();

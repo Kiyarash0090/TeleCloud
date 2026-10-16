@@ -7,6 +7,8 @@ import {
   Trash2,
   X,
   Loader2,
+  FolderPlus,
+  FolderMinus,
 } from 'lucide-react';
 import { useTelegram } from '../context/TelegramContext';
 import { useTheme } from '../context/ThemeContext';
@@ -25,8 +27,11 @@ export function MultiSelectBar() {
     deleteMultipleFiles,
     canDeleteFile,
     activeAudio,
+    openAddToFolderModal,
+    activeFolder,
+    removeFilesFromFolder,
   } = useTelegram();
-  const { lang } = useTheme();
+  const { t, lang } = useTheme();
 
   const [copiedBatch, setCopiedBatch] = useState(false);
   const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
@@ -143,6 +148,31 @@ export function MultiSelectBar() {
               </>
             )}
           </button>
+
+          {/* Batch Add to Folder */}
+          <button
+            onClick={() => openAddToFolderModal(selectedFiles)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer bg-white/10 hover:bg-white/15 text-white border border-white/10"
+            title={t('addToFolder')}
+          >
+            <FolderPlus className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+            <span className="hidden xs:inline">{t('addToFolder')}</span>
+          </button>
+
+          {/* Remove from active folder if inside a custom folder */}
+          {activeFolder && (
+            <button
+              onClick={() => {
+                removeFilesFromFolder(activeFolder.id, selectedFileIds);
+                clearSelection();
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30"
+              title={t('removeFromFolder')}
+            >
+              <FolderMinus className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden xs:inline">{t('removeFromFolder')}</span>
+            </button>
+          )}
 
           {/* Batch Delete (Available in Saved Messages, Bots, PVs, Admin Channels, and Accessible Groups) */}
           {canBatchDelete && (

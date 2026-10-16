@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   Bookmark,
   Radio,
@@ -18,185 +18,32 @@ export function ChatQuickSwitcher() {
     setActivePeer,
     setActiveTab,
     setIsChatSelectorOpen,
-    isChatSelectorOpen,
-    isConnected,
-    isDemoMode,
-    activeAccountId,
+    chats,
+    isLoadingChats,
+    quickFilter,
+    setQuickFilter,
+    filteredChats,
   } = useTelegram();
   const { lang } = useTheme();
 
-  const [chats, setChats] = useState<TelegramChat[]>([]);
-  const [isLoadingChats, setIsLoadingChats] = useState(false);
-  const [quickFilter, setQuickFilter] = useState<'all' | 'channel' | 'group' | 'user'>('all');
+  const stripRef = useRef<HTMLDivElement>(null);
   const activeChipRef = useRef<HTMLButtonElement | null>(null);
 
-  const fetchQuickChats = useCallback(
-    async (forceRefresh = false) => {
-      if (isDemoMode) {
-        setChats([
-          {
-            id: 'me',
-            title: lang === 'fa' ? 'سیو مسیج' : 'Saved',
-            type: 'saved',
-            username: 'me',
-            isPrivate: true,
-            canUpload: true,
-            canDelete: true,
-            isAdmin: true,
-          },
-          {
-            id: '-1001548293849',
-            title: lang === 'fa' ? 'کانال فیلم و سریال' : 'Movies & Media Channel',
-            type: 'channel',
-            username: 'telecloud_movies',
-            isPrivate: false,
-            canUpload: false,
-            canDelete: false,
-            isAdmin: false,
-          },
-          {
-            id: '-1001928374650',
-            title: lang === 'fa' ? 'کانال خصوصی پروژه (VIP)' : 'Private Project Channel',
-            type: 'channel',
-            username: '',
-            isPrivate: true,
-            canUpload: true,
-            canDelete: true,
-            isAdmin: true,
-          },
-          {
-            id: '-948271625',
-            title: lang === 'fa' ? 'گروه خصوصی تیم' : 'Private Team Group',
-            type: 'group',
-            username: '',
-            isPrivate: true,
-            canUpload: true,
-            canDelete: true,
-            isAdmin: true,
-          },
-          {
-            id: '-1001847592038',
-            title: lang === 'fa' ? 'آرشیو موزیک' : 'Music Archive Vault',
-            type: 'bot',
-            username: 'music_bot',
-            isPrivate: false,
-            canUpload: true,
-            canDelete: true,
-            isAdmin: false,
-          },
-          {
-            id: '184920491',
-            title: lang === 'fa' ? 'گفتگوی شخصی (John Doe)' : 'John Doe (PV)',
-            type: 'user',
-            username: 'johndoe',
-            isPrivate: false,
-            canUpload: true,
-            canDelete: true,
-            isAdmin: false,
-          },
-          {
-            id: '294817263',
-            title: lang === 'fa' ? 'علی محمدی (پی‌وی)' : 'Ali Mohammadi (PV)',
-            type: 'user',
-            username: '',
-            isPrivate: true,
-            canUpload: true,
-            canDelete: true,
-            isAdmin: false,
-          },
-        ]);
-        return;
-      }
-
-      if (!isConnected) {
-        setChats([
-          {
-            id: 'me',
-            title: lang === 'fa' ? 'سیو مسیج' : 'Saved',
-            type: 'saved',
-            username: 'me',
-            isPrivate: true,
-          },
-        ]);
-        return;
-      }
-
-      setIsLoadingChats(true);
-      try {
-        const res = await fetch(`/api/telegram/chats${forceRefresh ? '?refresh=1' : ''}`);
-        const data = await res.json();
-        if (data.success && Array.isArray(data.chats)) {
-          setChats(data.chats);
-        }
-      } catch (err) {
-        console.error('Failed to load quick chats:', err);
-      } finally {
-        setIsLoadingChats(false);
-      }
-    },
-    [isConnected, isDemoMode, lang]
-  );
-
+  // Auto-scroll the active channel tab into view smoothly
   useEffect(() => {
-    fetchQuickChats(false);
-  }, [fetchQuickChats, activeAccountId]);
-
-  useEffect(() => {
-    const handleGlobalRefresh = () => {
-      fetchQuickChats(true);
-    };
-    window.addEventListener('telecloud-pull-refresh', handleGlobalRefresh);
-    return () => window.removeEventListener('telecloud-pull-refresh', handleGlobalRefresh);
-  }, [fetchQuickChats]);
-
-  // Refresh quick bar if modal closed after potential refresh
-  useEffect(() => {
-    if (!isChatSelectorOpen && isConnected && chats.length <= 1) {
-      fetchQuickChats(false);
+    if (activeChipRef.current && stripRef.current) {
+      activeChipRef.current.scrollIntoView({
+        behavior: 'smooth',
+        inline: 'center',
+        block: 'nearest',
+      });
     }
-  }, [isChatSelectorOpen, isConnected, chats.length, fetchQuickChats]);
-
-  // Scroll active chat chip into view when activePeer changes
-  useEffect(() => {
-    if (activeChipRef.current) {
-      try {
-        activeChipRef.current.scrollIntoView({
-          behavior: 'smooth',
-          inline: 'center',
-          block: 'nearest',
-        });
-      } catch {}
-    }
-  }, [activePeer, quickFilter]);
+  }, [activePeer, quickFilter, filteredChats.length]);
 
   const handleSelectChat = (chat: TelegramChat) => {
     setActiveTab('files');
     setActivePeer(chat.id, chat.title, chat);
   };
-
-  const filteredChats = React.useMemo(() => {
-    const base =
-      chats.length > 0
-        ? chats
-        : [
-            {
-              id: 'me',
-              title: lang === 'fa' ? 'سیو مسیج' : 'Saved',
-              type: 'saved' as const,
-              username: 'me',
-              isPrivate: true,
-            },
-          ];
-
-    return base.filter((chat) => {
-      if (quickFilter === 'all') return true;
-      if (quickFilter === 'channel') return chat.type === 'channel';
-      if (quickFilter === 'group') return chat.type === 'group' || chat.type === 'supergroup';
-      if (quickFilter === 'user')
-        return chat.type === 'user' || chat.type === 'bot' || chat.type === 'service';
-      return true;
-    });
-  }, [chats, quickFilter, lang]);
 
   const getChipIcon = (chat: TelegramChat, isSelected: boolean) => {
     const iconClass = `w-3 h-3 shrink-0 ${
@@ -231,8 +78,11 @@ export function ChatQuickSwitcher() {
   const isSavedMessages = !activePeer || activePeer === 'me';
 
   return (
-    <div className="mb-2 sm:mb-2.5 rounded-xl bg-white/90 dark:bg-[#18191d]/90 backdrop-blur-md border border-slate-200/80 dark:border-zinc-800/80 p-1.5 sm:p-2 shadow-2xs select-none">
-      {/* Compact Single Top Row: Category Filters + Search All Button */}
+    <div
+      data-chat-switcher="true"
+      className="mb-2 sm:mb-2.5 rounded-xl bg-white/90 dark:bg-[#18191d]/90 backdrop-blur-md border border-slate-200/80 dark:border-zinc-800/80 p-1.5 sm:p-2 shadow-2xs select-none"
+    >
+      {/* Compact Top Row: Category Tabs + Search Button */}
       <div className="flex items-center justify-between gap-1 mb-1.5">
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
           {[
@@ -272,9 +122,12 @@ export function ChatQuickSwitcher() {
         </button>
       </div>
 
-      {/* Compact Horizontal Scrollable Channels & Chats Strip */}
-      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-        {filteredChats.slice(0, 40).map((chat) => {
+      {/* Horizontal Scrollable Channels Strip */}
+      <div
+        ref={stripRef}
+        className="flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth"
+      >
+        {filteredChats.slice(0, 60).map((chat) => {
           const isSelected =
             (chat.id === 'me' && isSavedMessages) || activePeer === chat.id;
           const isPrivateNoUsername = chat.type !== 'saved' && !chat.username;
@@ -288,17 +141,17 @@ export function ChatQuickSwitcher() {
           return (
             <button
               key={chat.id}
-              ref={isSelected ? activeChipRef : null}
+              ref={isSelected ? (el) => { activeChipRef.current = el; } : undefined}
               type="button"
               onClick={() => handleSelectChat(chat)}
-              className={`group flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold shrink-0 transition-all active:scale-95 cursor-pointer border ${
+              className={`group flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold shrink-0 transition-all active:scale-95 cursor-pointer border ${
                 isSelected
                   ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white border-transparent shadow-2xs font-bold'
                   : 'bg-slate-50/90 dark:bg-zinc-800/60 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 border-slate-200/70 dark:border-zinc-700/60'
               }`}
             >
               {getChipIcon(chat, isSelected)}
-              <span className="truncate max-w-[105px] sm:max-w-[140px]" dir="auto">
+              <span className="truncate max-w-[110px] sm:max-w-[145px]" dir="auto">
                 {displayTitle}
               </span>
               {isPrivateNoUsername && (
@@ -325,7 +178,7 @@ export function ChatQuickSwitcher() {
 
         {filteredChats.length === 0 && !isLoadingChats && (
           <div className="text-[10px] text-slate-400 dark:text-zinc-500 py-0.5 px-1.5">
-            {lang === 'fa' ? 'موردی یافت نشد' : 'No chats found'}
+            {lang === 'fa' ? 'موردی در این تب یافت نشد' : 'No items found in this tab'}
           </div>
         )}
       </div>

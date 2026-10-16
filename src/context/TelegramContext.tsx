@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useTheme } from './ThemeContext';
 import {
   TelegramFile,
   TelegramChat,
@@ -10,6 +11,7 @@ import {
   SortOption,
   ViewMode,
   ActiveTab,
+  UserFolder,
 } from '../types';
 import { DEMO_FILES, DEMO_STATS } from '../utils/demoData';
 
@@ -129,10 +131,59 @@ function normalizeFavoriteFile(
   };
 }
 
+const CUSTOM_FOLDERS_STORAGE_KEY = 'telecloud_custom_folders';
+
+function loadSavedFolders(): UserFolder[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_FOLDERS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((item: any) => ({
+      id: String(item.id || `fld_${Date.now()}`),
+      name: String(item.name || 'Folder'),
+      color: String(item.color || 'blue'),
+      icon: item.icon || 'folder',
+      files: Array.isArray(item.files)
+        ? item.files.map((f: any) => normalizeFavoriteFile(f))
+        : [],
+      createdAt: Number(item.createdAt) || Date.now(),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function saveFoldersToStorage(list: UserFolder[]) {
+  try {
+    localStorage.setItem(CUSTOM_FOLDERS_STORAGE_KEY, JSON.stringify(list));
+  } catch {}
+}
+
 interface TelegramContextType {
   // Navigation tabs
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
+
+  // Custom User Folders
+  folders: UserFolder[];
+  activeFolderId: string | null;
+  activeFolder: UserFolder | null;
+  setActiveFolderId: (id: string | null) => void;
+  createFolder: (name: string, color?: string, icon?: string, initialFiles?: TelegramFile[]) => UserFolder;
+  updateFolder: (id: string, name: string, color?: string, icon?: string) => void;
+  deleteFolder: (id: string) => void;
+  addFilesToFolder: (folderId: string, files: TelegramFile[]) => void;
+  removeFilesFromFolder: (folderId: string, fileIds: number[]) => void;
+  isFolderModalOpen: boolean;
+  setIsFolderModalOpen: (open: boolean) => void;
+  folderToEdit: UserFolder | null;
+  setFolderToEdit: (f: UserFolder | null) => void;
+  isAddToFolderModalOpen: boolean;
+  setIsAddToFolderModalOpen: (open: boolean) => void;
+  targetFilesForFolder: TelegramFile[];
+  setTargetFilesForFolder: (files: TelegramFile[]) => void;
+  openAddToFolderModal: (filesToTarget: TelegramFile | TelegramFile[]) => void;
 
   // Web app auth
   isAppConfigured: boolean;
@@ -245,6 +296,15 @@ interface TelegramContextType {
   isChatSelectorOpen: boolean;
   setIsChatSelectorOpen: (open: boolean) => void;
 
+  // Channel Tabs & Swipe Switcher
+  chats: TelegramChat[];
+  isLoadingChats: boolean;
+  quickFilter: 'all' | 'channel' | 'group' | 'user';
+  setQuickFilter: (filter: 'all' | 'channel' | 'group' | 'user') => void;
+  filteredChats: TelegramChat[];
+  fetchChats: (forceRefresh?: boolean) => Promise<TelegramChat[]>;
+  switchToNextChat: (direction: 'next' | 'prev') => void;
+
   // Mobile Back Button, Double-Back-to-Exit & Action Toast
   showExitToast: boolean;
   actionToast: string | null;
@@ -256,6 +316,8 @@ interface TelegramContextType {
 const TelegramContext = createContext<TelegramContextType | undefined>(undefined);
 
 export function TelegramProvider({ children }: { children: React.ReactNode }) {
+  const { lang } = useTheme();
+
   // Navigation active tab
   const [activeTab, setActiveTab] = useState<ActiveTab>('files');
 
@@ -302,6 +364,214 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
       setActionToast(null);
     }, 3500);
   }, []);
+
+  // Channel Tabs & Swipe Switcher state
+  const [chats, setChats] = useState<TelegramChat[]>([]);
+  const [isLoadingChats, setIsLoadingChats] = useState<boolean>(false);
+  const [quickFilter, setQuickFilter] = useState<'all' | 'channel' | 'group' | 'user'>('all');
+
+  const fetchChats = useCallback(async (forceRefresh = false): Promise<TelegramChat[]> => {
+    if (isDemoMode) {
+      const demoList: TelegramChat[] = [
+        {
+          id: 'me',
+          title: lang === 'fa' ? 'سیو مسیج' : 'Saved',
+          type: 'saved',
+          username: 'me',
+          isPrivate: true,
+          canUpload: true,
+          canDelete: true,
+          isAdmin: true,
+        },
+        {
+          id: '-1001548293849',
+          title: lang === 'fa' ? 'کانال فیلم و سریال' : 'Movies & Media Channel',
+          type: 'channel',
+          username: 'telecloud_movies',
+          isPrivate: false,
+          canUpload: false,
+          canDelete: false,
+          isAdmin: false,
+        },
+        {
+          id: '-1001928374650',
+          title: lang === 'fa' ? 'کانال خصوصی پروژه (VIP)' : 'Private Project Channel',
+          type: 'channel',
+          username: '',
+          isPrivate: true,
+          canUpload: true,
+          canDelete: true,
+          isAdmin: true,
+        },
+        {
+          id: '-948271625',
+          title: lang === 'fa' ? 'گروه خصوصی تیم' : 'Private Team Group',
+          type: 'group',
+          username: '',
+          isPrivate: true,
+          canUpload: true,
+          canDelete: true,
+          isAdmin: true,
+        },
+        {
+          id: '-1001847592038',
+          title: lang === 'fa' ? 'آرشیو موزیک' : 'Music Archive Vault',
+          type: 'bot',
+          username: 'music_bot',
+          isPrivate: false,
+          canUpload: true,
+          canDelete: true,
+          isAdmin: false,
+        },
+        {
+          id: '184920491',
+          title: lang === 'fa' ? 'گفتگوی شخصی (John Doe)' : 'John Doe (PV)',
+          type: 'user',
+          username: 'johndoe',
+          isPrivate: false,
+          canUpload: true,
+          canDelete: true,
+          isAdmin: false,
+        },
+        {
+          id: '294817263',
+          title: lang === 'fa' ? 'علی محمدی (پی‌وی)' : 'Ali Mohammadi (PV)',
+          type: 'user',
+          username: '',
+          isPrivate: true,
+          canUpload: true,
+          canDelete: true,
+          isAdmin: false,
+        },
+      ];
+      setChats(demoList);
+      return demoList;
+    }
+
+    if (!isConnected) {
+      const defaultList: TelegramChat[] = [
+        {
+          id: 'me',
+          title: lang === 'fa' ? 'سیو مسیج' : 'Saved',
+          type: 'saved',
+          username: 'me',
+          isPrivate: true,
+          canUpload: true,
+          canDelete: true,
+          isAdmin: true,
+        },
+      ];
+      setChats(defaultList);
+      return defaultList;
+    }
+
+    setIsLoadingChats(true);
+    try {
+      const res = await fetch(`/api/telegram/chats${forceRefresh ? '?refresh=1' : ''}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.chats)) {
+        setChats(data.chats);
+        return data.chats;
+      }
+    } catch (err) {
+      console.error('Failed to load quick chats:', err);
+    } finally {
+      setIsLoadingChats(false);
+    }
+    return [];
+  }, [isDemoMode, isConnected, lang]);
+
+  useEffect(() => {
+    fetchChats(false);
+  }, [fetchChats, activeAccountId]);
+
+  useEffect(() => {
+    const handleGlobalRefresh = () => {
+      fetchChats(true);
+    };
+    window.addEventListener('telecloud-pull-refresh', handleGlobalRefresh);
+    return () => window.removeEventListener('telecloud-pull-refresh', handleGlobalRefresh);
+  }, [fetchChats]);
+
+  const filteredChats = useMemo(() => {
+    const base =
+      chats.length > 0
+        ? chats
+        : [
+            {
+              id: 'me',
+              title: lang === 'fa' ? 'سیو مسیج' : 'Saved',
+              type: 'saved' as const,
+              username: 'me',
+              isPrivate: true,
+              canUpload: true,
+              canDelete: true,
+              isAdmin: true,
+            },
+          ];
+
+    return base.filter((chat) => {
+      if (quickFilter === 'all') return true;
+      if (quickFilter === 'channel') return chat.type === 'channel';
+      if (quickFilter === 'group') return chat.type === 'group' || chat.type === 'supergroup';
+      if (quickFilter === 'user')
+        return chat.type === 'user' || chat.type === 'bot' || chat.type === 'service';
+      return true;
+    });
+  }, [chats, quickFilter, lang]);
+
+  const switchToNextChat = useCallback(
+    (direction: 'next' | 'prev') => {
+      const list = filteredChats;
+      if (!list || list.length <= 1) return;
+
+      const isSaved = !activePeer || activePeer === 'me';
+      const currentIndex = list.findIndex(
+        (c) => (c.id === 'me' && isSaved) || c.id === activePeer
+      );
+
+      let targetIndex = 0;
+      if (currentIndex === -1) {
+        targetIndex = direction === 'next' ? 0 : list.length - 1;
+      } else {
+        if (direction === 'next') {
+          targetIndex = (currentIndex + 1) % list.length;
+        } else {
+          targetIndex = (currentIndex - 1 + list.length) % list.length;
+        }
+      }
+
+      const targetChat = list[targetIndex];
+      if (!targetChat) return;
+
+      setActivePeerState(targetChat.id);
+      setActiveChatTitle(
+        targetChat.id === 'me' || targetChat.type === 'saved'
+          ? (lang === 'fa' ? 'سیو مسیج' : 'Saved Messages')
+          : targetChat.title
+      );
+      setSelectedFileIds([]);
+
+      if (targetChat.id === 'me' || targetChat.type === 'saved') {
+        setCanUploadInActiveChat(true);
+        setCanDeleteInActiveChat(true);
+        setIsActiveChatAdmin(true);
+        setActiveChatType('saved');
+      } else {
+        const cType = targetChat.type || 'user';
+        const cUpload = targetChat.canUpload !== undefined
+          ? targetChat.canUpload
+          : cType === 'bot' || cType === 'user' || cType === 'group' || cType === 'supergroup';
+        const cDelete = targetChat.canDelete !== undefined ? targetChat.canDelete : cUpload;
+        const cAdmin = Boolean(targetChat.isAdmin);
+        setCanUploadInActiveChat(cUpload);
+        setCanDeleteInActiveChat(cDelete);
+        setIsActiveChatAdmin(cAdmin);
+        setActiveChatType(cType);
+      }
+    },
+    [filteredChats, activePeer, lang]
+  );
 
   // File data, in-memory channel cache & pagination
   const [files, setFiles] = useState<TelegramFile[]>([]);
@@ -401,6 +671,20 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
 
   const [selectedFileIds, setSelectedFileIds] = useState<number[]>([]);
   const [showExitToast, setShowExitToast] = useState(false);
+
+  // Custom User Folders state
+  const [folders, setFolders] = useState<UserFolder[]>(loadSavedFolders);
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
+  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+  const [folderToEdit, setFolderToEdit] = useState<UserFolder | null>(null);
+  const [isAddToFolderModalOpen, setIsAddToFolderModalOpen] = useState(false);
+  const [targetFilesForFolder, setTargetFilesForFolder] = useState<TelegramFile[]>([]);
+
+  const activeFolder = useMemo(() => {
+    if (!activeFolderId) return null;
+    return folders.find((f) => f.id === activeFolderId) || null;
+  }, [folders, activeFolderId]);
+
 
   // Global Favorites state persisted in localStorage across all chats & channels
   const [favoriteFiles, setFavoriteFiles] = useState<TelegramFile[]>(() => {
@@ -1537,7 +1821,7 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
   // Extract all unique file extensions in the current view
   const availableExtensions = React.useMemo(() => {
     const exts = new Set<string>();
-    const source = activeTab === 'favorites' ? favoriteFiles : files;
+    const source = activeFolder ? activeFolder.files : activeTab === 'favorites' ? favoriteFiles : files;
     source.forEach((f) => {
       const ext = f.filename.split('.').pop()?.toLowerCase();
       if (ext && ext !== f.filename.toLowerCase()) {
@@ -1545,12 +1829,12 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
       }
     });
     return Array.from(exts);
-  }, [files, favoriteFiles, activeTab]);
+  }, [files, favoriteFiles, activeTab, activeFolder]);
 
   // Filtering and Sorting
   const filteredFiles = React.useMemo(() => {
-    // When activeTab is 'favorites', use the global list of favorite files across ALL chats & channels
-    let result = activeTab === 'favorites' ? [...favoriteFiles] : [...files];
+    // When an activeFolder is selected, use that folder's files
+    let result = activeFolder ? [...activeFolder.files] : activeTab === 'favorites' ? [...favoriteFiles] : [...files];
 
     // Category filter
     if (selectedCategory !== 'all') {
@@ -1595,7 +1879,7 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
     });
 
     return result;
-  }, [files, activeTab, favoriteFiles, selectedCategory, selectedExtension, searchQuery, sortOption]);
+  }, [files, activeTab, favoriteFiles, activeFolder, selectedCategory, selectedExtension, searchQuery, sortOption]);
 
   const selectAllFiltered = useCallback(() => {
     const allFilteredIds = filteredFiles.map(f => f.id);
@@ -1607,6 +1891,111 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
       return allFilteredIds;
     });
   }, [filteredFiles]);
+
+  // Custom User Folder operations
+  const createFolder = useCallback(
+    (name: string, color: string = 'blue', icon: string = 'folder', initialFiles?: TelegramFile[]): UserFolder => {
+      const newFolder: UserFolder = {
+        id: `fld_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        name: name.trim() || (lang === 'fa' ? 'پوشه جدید' : 'New Folder'),
+        color,
+        icon,
+        files: initialFiles ? initialFiles.map((f) => normalizeFavoriteFile(f, activePeer, activeChatTitle)) : [],
+        createdAt: Date.now(),
+      };
+      setFolders((prev) => {
+        const next = [newFolder, ...prev];
+        saveFoldersToStorage(next);
+        return next;
+      });
+      showActionToast(lang === 'fa' ? 'پوشه جدید با موفقیت ایجاد شد' : 'Folder created successfully');
+      return newFolder;
+    },
+    [lang, activePeer, activeChatTitle, showActionToast]
+  );
+
+  const updateFolder = useCallback((id: string, name: string, color?: string, icon?: string) => {
+    setFolders((prev) => {
+      const next = prev.map((f) => {
+        if (f.id !== id) return f;
+        return {
+          ...f,
+          name: name.trim() || f.name,
+          color: color || f.color,
+          icon: icon || f.icon,
+        };
+      });
+      saveFoldersToStorage(next);
+      return next;
+    });
+    showActionToast(lang === 'fa' ? 'تغییرات پوشه ذخیره شد' : 'Folder updated successfully');
+  }, [lang, showActionToast]);
+
+  const deleteFolder = useCallback((id: string) => {
+    setFolders((prev) => {
+      const next = prev.filter((f) => f.id !== id);
+      saveFoldersToStorage(next);
+      return next;
+    });
+    setActiveFolderId((curr) => (curr === id ? null : curr));
+    showActionToast(lang === 'fa' ? 'پوشه حذف شد' : 'Folder deleted');
+  }, [lang, showActionToast]);
+
+  const addFilesToFolder = useCallback(
+    (folderId: string, filesToAdd: TelegramFile[]) => {
+      let addedCount = 0;
+      setFolders((prev) => {
+        const next = prev.map((fld) => {
+          if (fld.id !== folderId) return fld;
+          const existingIds = new Set(fld.files.map((f) => f.id));
+          const newItems = filesToAdd
+            .filter((f) => !existingIds.has(f.id))
+            .map((f) => normalizeFavoriteFile(f, activePeer, activeChatTitle));
+          addedCount = newItems.length;
+          return {
+            ...fld,
+            files: [...fld.files, ...newItems],
+          };
+        });
+        saveFoldersToStorage(next);
+        return next;
+      });
+      if (addedCount > 0) {
+        showActionToast(
+          lang === 'fa'
+            ? `${addedCount} فایل به پوشه افزوده شد`
+            : `${addedCount} file(s) added to folder`
+        );
+      }
+    },
+    [activePeer, activeChatTitle, lang, showActionToast]
+  );
+
+  const removeFilesFromFolder = useCallback(
+    (folderId: string, fileIdsToRemove: number[]) => {
+      const idsSet = new Set(fileIdsToRemove);
+      setFolders((prev) => {
+        const next = prev.map((fld) => {
+          if (fld.id !== folderId) return fld;
+          return {
+            ...fld,
+            files: fld.files.filter((f) => !idsSet.has(f.id)),
+          };
+        });
+        saveFoldersToStorage(next);
+        return next;
+      });
+      showActionToast(lang === 'fa' ? 'از پوشه خارج شد' : 'Removed from folder');
+    },
+    [lang, showActionToast]
+  );
+
+  const openAddToFolderModal = useCallback((filesToTarget: TelegramFile | TelegramFile[]) => {
+    const list = Array.isArray(filesToTarget) ? filesToTarget : [filesToTarget];
+    setTargetFilesForFolder(list);
+    setIsAddToFolderModalOpen(true);
+  }, []);
+
 
   // ============================================================================
   // Mobile Hardware Back Button & Double-Back-to-Exit Controller
@@ -1974,6 +2363,27 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         setIsAccountDrawerOpen,
         isPlayingAudio,
 
+        // Custom User Folders
+        folders,
+        activeFolderId,
+        activeFolder,
+        setActiveFolderId,
+        createFolder,
+        updateFolder,
+        deleteFolder,
+        addFilesToFolder,
+        removeFilesFromFolder,
+        isFolderModalOpen,
+        setIsFolderModalOpen,
+        folderToEdit,
+        setFolderToEdit,
+        isAddToFolderModalOpen,
+        setIsAddToFolderModalOpen,
+        targetFilesForFolder,
+        setTargetFilesForFolder,
+        openAddToFolderModal,
+
+
         setIsPlayingAudio,
         isVideoPiP,
         setIsVideoPiP,
@@ -1992,6 +2402,13 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         setActivePeer,
         isChatSelectorOpen,
         setIsChatSelectorOpen,
+        chats,
+        isLoadingChats,
+        quickFilter,
+        setQuickFilter,
+        filteredChats,
+        fetchChats,
+        switchToNextChat,
         showExitToast,
         actionToast,
         actionError: actionToast,

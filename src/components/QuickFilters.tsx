@@ -32,7 +32,7 @@ export function QuickFilters() {
   const totalFilteredSize = filteredFiles.reduce((acc, f) => acc + f.size, 0);
 
   return (
-    <div className="mb-2.5 sm:mb-4 select-none">
+    <div data-quick-filters="true" className="mb-2.5 sm:mb-4 select-none">
       {/* Main Toolbar Row */}
       <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2.5 py-1.5 px-2.5 sm:px-3.5 rounded-xl sm:rounded-2xl bg-white/80 dark:bg-[#18191d]/80 backdrop-blur-md border border-slate-200/80 dark:border-zinc-800/80 shadow-2xs">
         {/* Left: Summary & Format Extension Chips */}

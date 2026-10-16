@@ -25,13 +25,18 @@ import {
   Link2,
   Info,
   Star,
+  Download,
+  Settings2,
 } from 'lucide-react';
 import { FileCategory } from '../types';
 import { useTelegram } from '../context/TelegramContext';
 import { useTheme } from '../context/ThemeContext';
+import { usePWAInstall } from '../hooks/usePWAInstall';
 import { formatFileSize } from '../utils/formatters';
+import { getFolderColor, getFolderIcon } from '../utils/folderHelpers';
 
 export function Sidebar({ onClose, className }: { onClose?: () => void; className?: string }) {
+  const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const {
     activeTab,
     setActiveTab,
@@ -55,6 +60,11 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
     canUploadInActiveChat,
     setIsChatSelectorOpen,
     favoriteFileIds,
+    folders,
+    activeFolderId,
+    setActiveFolderId,
+    setIsFolderModalOpen,
+    setFolderToEdit,
   } = useTelegram();
 
 
@@ -76,6 +86,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
 
   const handleSelectCategory = (id: FileCategory) => {
     setActiveTab('files');
+    setActiveFolderId(null);
     setSelectedCategory(id);
     setSelectedExtension(null);
     onClose?.();
@@ -470,6 +481,115 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
           )}
         </button>
 
+        {/* ================================================================= */}
+        {/* Custom User Folders Section                                       */}
+        {/* ================================================================= */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between px-2 mb-2">
+            <span className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Folder className="w-3.5 h-3.5 text-blue-500" />
+              <span>{t('myFolders')}</span>
+              {folders.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-md bg-blue-500/10 text-blue-600 dark:text-sky-400 font-mono text-[10px]">
+                  {folders.length}
+                </span>
+              )}
+            </span>
+
+            <button
+              onClick={() => {
+                setFolderToEdit(null);
+                setIsFolderModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-sky-400 hover:text-blue-700 dark:hover:text-sky-300 px-1.5 py-0.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+              title={t('createFolder')}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{t('newFolder')}</span>
+            </button>
+          </div>
+
+          {folders.length === 0 ? (
+            <div
+              onClick={() => {
+                setFolderToEdit(null);
+                setIsFolderModalOpen(true);
+              }}
+              className="p-2.5 rounded-2xl border border-dashed border-slate-200 dark:border-zinc-800 hover:border-blue-400 dark:hover:border-sky-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all cursor-pointer text-center group"
+            >
+              <div className="w-7 h-7 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center mx-auto mb-1 group-hover:scale-110 transition-transform">
+                <Plus className="w-3.5 h-3.5" />
+              </div>
+              <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 block">
+                {t('createFolder')}
+              </span>
+              <span className="text-[10px] text-slate-400 dark:text-zinc-500">
+                {lang === 'fa' ? 'دسته‌بندی فایل‌ها در پوشه دلخواه' : 'Organize files into folders'}
+              </span>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {folders.map((folder) => {
+                const colorConfig = getFolderColor(folder.color);
+                const FolderIcon = getFolderIcon(folder.icon);
+                const isActive = activeTab === 'files' && activeFolderId === folder.id;
+
+                return (
+                  <div
+                    key={folder.id}
+                    onClick={() => {
+                      setActiveTab('files');
+                      setActiveFolderId(folder.id);
+                      setSelectedCategory('all');
+                      setSelectedExtension(null);
+                      onClose?.();
+                    }}
+                    className={`group/folder w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer active:scale-[0.99] ${
+                      isActive
+                        ? `${colorConfig.bgClass} ${colorConfig.textClass} font-bold shadow-2xs border ${colorConfig.borderClass}`
+                        : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/60 hover:text-slate-900 dark:hover:text-zinc-200 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <FolderIcon
+                        className={`w-4 h-4 shrink-0 ${
+                          isActive ? colorConfig.textClass : 'opacity-70 group-hover/folder:opacity-100'
+                        }`}
+                      />
+                      <span className="truncate">{folder.name}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono tabular-nums font-bold ${
+                          isActive
+                            ? 'bg-white/80 dark:bg-zinc-800/80'
+                            : 'bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400'
+                        }`}
+                      >
+                        {folder.files.length}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFolderToEdit(folder);
+                          setIsFolderModalOpen(true);
+                        }}
+                        className="opacity-0 group-hover/folder:opacity-100 p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition"
+                        title={t('editFolder')}
+                      >
+                        <Settings2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* Section Label */}
         <div className="px-2 mb-2 text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">
           {lang === 'fa' ? 'دسته‌بندی فایل‌ها' : 'Storage Categories'}
@@ -540,6 +660,28 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
             <span>{isDark ? t('lightMode') : t('darkMode')}</span>
           </button>
         </div>
+
+        {/* Mobile PWA Install option */}
+        {!isInstalled && (isInstallable || isIOS) && (
+          <button
+            onClick={() => {
+              if (isIOS) {
+                window.dispatchEvent(new CustomEvent('telecloud-show-ios-guide'));
+              } else {
+                install();
+              }
+            }}
+            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 text-blue-600 dark:text-sky-400 text-xs font-bold transition active:scale-98 cursor-pointer"
+          >
+            <span className="flex items-center gap-2">
+              <Download className="w-4 h-4" />
+              <span>{lang === 'fa' ? 'نصب اپلیکیشن مستقل' : 'Install TeleCloud App'}</span>
+            </span>
+            <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">
+              {lang === 'fa' ? 'نصب' : 'Install'}
+            </span>
+          </button>
+        )}
 
         {/* Storage Card */}
         <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800/80 shadow-2xs">

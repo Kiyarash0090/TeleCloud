@@ -101,3 +101,13 @@ export type ActiveTab = 'files' | 'account' | 'favorites';
 export type ViewMode = 'grid' | 'list';
 export type SortOption = 'date_desc' | 'date_asc' | 'size_desc' | 'size_asc' | 'name_asc' | 'name_desc';
 export type Language = 'fa' | 'en';
+
+export interface UserFolder {
+  id: string;
+  name: string;
+  color: string;
+  icon?: string;
+  files: TelegramFile[];
+  createdAt: number;
+}
+

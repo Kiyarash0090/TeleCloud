@@ -18,12 +18,15 @@ import {
   Link2,
   Star,
   Lock,
+  Download,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useTelegram, useBackHandler } from '../context/TelegramContext';
+import { usePWAInstall } from '../hooks/usePWAInstall';
 
 export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void }) {
   const { isDark, toggleTheme, lang, setLang, t } = useTheme();
+  const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const {
     activeTab,
     setActiveTab,
@@ -83,7 +86,12 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
   };
 
   return (
-    <header className="shrink-0 sticky top-0 z-40 w-full h-14 md:h-16 border-b border-slate-200/80 dark:border-zinc-800/80 bg-white/95 dark:bg-[#131418]/95 backdrop-blur-xl px-3 sm:px-4 lg:px-6 flex items-center justify-between gap-2.5 sm:gap-3.5 transition-colors select-none">
+    <header
+      data-header="true"
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
+      className="shrink-0 sticky top-0 z-40 w-full h-14 md:h-16 border-b border-slate-200/80 dark:border-zinc-800/80 bg-white/95 dark:bg-[#131418]/95 backdrop-blur-xl px-3 sm:px-4 lg:px-6 flex items-center justify-between gap-2.5 sm:gap-3.5 transition-colors select-none"
+    >
       {/* Start: Mobile Menu Button & Desktop Breadcrumbs */}
       <div className="flex items-center gap-2 shrink-0 md:min-w-0">
         {onToggleMobileMenu && (
@@ -249,6 +257,24 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
             )}
           </div>
         </button>
+
+        {/* PWA Install Button (Only when not installed in standalone mode) */}
+        {!isInstalled && (isInstallable || isIOS) && (
+          <button
+            onClick={() => {
+              if (isIOS) {
+                window.dispatchEvent(new CustomEvent('telecloud-show-ios-guide'));
+              } else {
+                install();
+              }
+            }}
+            className="flex items-center gap-1.5 px-2 sm:px-3 h-9 md:h-10 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 text-blue-600 dark:text-sky-400 text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/60 active:scale-95 transition-all cursor-pointer shadow-2xs"
+            title={lang === 'fa' ? 'نصب اپلیکیشن مستقل' : 'Install App'}
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden xl:inline">{lang === 'fa' ? 'نصب برنامه' : 'Install'}</span>
+          </button>
+        )}
 
         {/* Lock / Master Logout */}
         <button

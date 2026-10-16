@@ -23,7 +23,11 @@ import { ChatSelectorModal } from './components/ChatSelectorModal';
 import { ChatQuickSwitcher } from './components/ChatQuickSwitcher';
 import { TelegramLinkModal } from './components/TelegramLinkModal';
 import { AccountSwitcherDrawer } from './components/AccountSwitcherDrawer';
-import { RotateCw, UploadCloud, LogOut, Loader2 } from 'lucide-react';
+import { PWAInstallBanner } from './components/PWAInstallBanner';
+import { FolderModal } from './components/FolderModal';
+import { AddToFolderModal } from './components/AddToFolderModal';
+import { getFolderColor, getFolderIcon } from './utils/folderHelpers';
+import { RotateCw, UploadCloud, LogOut, Loader2, Folder, Edit3, X } from 'lucide-react';
 
 function TeleCloudApp() {
   const {
@@ -65,6 +69,14 @@ function TeleCloudApp() {
     loadMoreFiles,
     refreshFiles,
     fetchFullUser,
+    filteredChats,
+    switchToNextChat,
+    isSelectionMode,
+    activeFolder,
+    activeFolderId,
+    setActiveFolderId,
+    setFolderToEdit,
+    setIsFolderModalOpen,
   } = useTelegram();
 
   const { addFilesToQueue } = useQueue();
@@ -74,77 +86,127 @@ function TeleCloudApp() {
   const dragCounterRef = useRef(0);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
   const mainScrollRef = useRef<HTMLElement>(null);
-  const pullStartRef = useRef<{ x: number; y: number } | null>(null);
-  const isPullLockedHorizontalRef = useRef(false);
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const swipeGestureTypeRef = useRef<'pull' | 'horizontal' | null>(null);
+  const horizontalSwipeDeltaRef = useRef<number>(0);
+  const canHorizontalSwipeRef = useRef<boolean>(true);
   const [pullDistance, setPullDistance] = useState(0);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
 
   const handleMainTouchStart = (e: React.TouchEvent<HTMLElement>) => {
-    const el = mainScrollRef.current;
-    if (!el || el.scrollTop > 2 || isPullRefreshing || isLoading) return;
+    if (
+      isLoginModalOpen ||
+      isUploadModalOpen ||
+      isChatSelectorOpen ||
+      isTelegramLinkModalOpen ||
+      isAccountDrawerOpen ||
+      isMobileMenuOpen ||
+      activeVideo ||
+      activeImage ||
+      activeDoc ||
+      isSelectionMode ||
+      isPullRefreshing
+    ) {
+      return;
+    }
+
+    const target = e.target as HTMLElement | null;
+    const isExcludedFromHorizontal = Boolean(
+      target?.closest(
+        'header, [data-header], [data-chat-switcher], [data-quick-filters], [data-no-swipe], button, input, select, textarea, .overflow-x-auto, [role="tablist"], [role="tab"]'
+      )
+    );
+    canHorizontalSwipeRef.current = !isExcludedFromHorizontal;
+
     const touch = e.touches[0];
     if (!touch) return;
-    pullStartRef.current = { x: touch.clientX, y: touch.clientY };
-    isPullLockedHorizontalRef.current = false;
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+    swipeGestureTypeRef.current = null;
+    horizontalSwipeDeltaRef.current = 0;
   };
 
   const handleMainTouchMove = (e: React.TouchEvent<HTMLElement>) => {
-    const start = pullStartRef.current;
+    const start = touchStartRef.current;
     const el = mainScrollRef.current;
     if (!start || !el || isPullRefreshing) return;
-
-    if (el.scrollTop > 2) {
-      pullStartRef.current = null;
-      setPullDistance(0);
-      return;
-    }
 
     const touch = e.touches[0];
     if (!touch) return;
     const deltaX = touch.clientX - start.x;
     const deltaY = touch.clientY - start.y;
 
-    if (!isPullLockedHorizontalRef.current && Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
-      isPullLockedHorizontalRef.current = true;
-      pullStartRef.current = null;
-      setPullDistance(0);
-      return;
+    if (!swipeGestureTypeRef.current) {
+      if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 8) {
+        if (el.scrollTop <= 2 && deltaY > 0 && !isLoading) {
+          swipeGestureTypeRef.current = 'pull';
+        } else {
+          touchStartRef.current = null;
+          return;
+        }
+      } else if (
+        canHorizontalSwipeRef.current &&
+        Math.abs(deltaX) > Math.abs(deltaY) * 1.3 &&
+        Math.abs(deltaX) > 12 &&
+        activeTab === 'files' &&
+        filteredChats.length > 1
+      ) {
+        swipeGestureTypeRef.current = 'horizontal';
+      }
     }
 
-    if (isPullLockedHorizontalRef.current) return;
-
-    if (deltaY > 6) {
-      const damped = Math.min(96, (deltaY - 6) * 0.45);
-      setPullDistance(damped);
-    } else {
-      setPullDistance(0);
+    if (swipeGestureTypeRef.current === 'pull') {
+      if (el.scrollTop > 2) {
+        touchStartRef.current = null;
+        swipeGestureTypeRef.current = null;
+        setPullDistance(0);
+        return;
+      }
+      if (deltaY > 6) {
+        const damped = Math.min(96, (deltaY - 6) * 0.45);
+        setPullDistance(damped);
+      } else {
+        setPullDistance(0);
+      }
+    } else if (swipeGestureTypeRef.current === 'horizontal') {
+      horizontalSwipeDeltaRef.current = deltaX;
     }
   };
 
   const handleMainTouchEnd = async () => {
-    if (!pullStartRef.current) return;
-    pullStartRef.current = null;
+    const gestureType = swipeGestureTypeRef.current;
+    const currentDelta = horizontalSwipeDeltaRef.current;
 
-    if (pullDistance >= 54 && !isPullRefreshing) {
-      setIsPullRefreshing(true);
-      setPullDistance(52);
-      if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+    touchStartRef.current = null;
+    swipeGestureTypeRef.current = null;
+    horizontalSwipeDeltaRef.current = 0;
+    canHorizontalSwipeRef.current = true;
+
+    if (gestureType === 'pull') {
+      if (pullDistance >= 54 && !isPullRefreshing) {
+        setIsPullRefreshing(true);
+        setPullDistance(52);
+        if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+          try {
+            window.navigator.vibrate(25);
+          } catch {}
+        }
+        window.dispatchEvent(new CustomEvent('telecloud-pull-refresh'));
         try {
-          window.navigator.vibrate(25);
-        } catch {}
-      }
-      window.dispatchEvent(new CustomEvent('telecloud-pull-refresh'));
-      try {
-        await Promise.all([
-          refreshFiles(true),
-          fetchFullUser(),
-        ]);
-      } finally {
-        setIsPullRefreshing(false);
+          await Promise.all([
+            refreshFiles(true),
+            fetchFullUser(),
+          ]);
+        } finally {
+          setIsPullRefreshing(false);
+          setPullDistance(0);
+        }
+      } else {
         setPullDistance(0);
       }
-    } else {
-      setPullDistance(0);
+    } else if (gestureType === 'horizontal') {
+      if (Math.abs(currentDelta) >= 42 && filteredChats.length > 1) {
+        switchToNextChat(currentDelta < 0 ? 'next' : 'prev');
+      }
     }
   };
 
@@ -349,14 +411,75 @@ function TeleCloudApp() {
             <AccountPage />
           ) : (
             <>
+              {/* Active Folder Header Banner */}
+              {activeFolder && (
+                <div className="mb-2.5 sm:mb-3 px-3.5 sm:px-4 py-2.5 rounded-2xl bg-white/90 dark:bg-[#18191d]/90 backdrop-blur-md border border-slate-200/80 dark:border-zinc-800/80 shadow-2xs flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {(() => {
+                      const colorConfig = getFolderColor(activeFolder.color);
+                      const FolderIcon = getFolderIcon(activeFolder.icon);
+                      return (
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${colorConfig.bgClass} ${colorConfig.textClass}`}
+                        >
+                          <FolderIcon className="w-5 h-5" />
+                        </div>
+                      );
+                    })()}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h2 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
+                          {activeFolder.name}
+                        </h2>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200/60 dark:border-zinc-700/60 shrink-0">
+                          {activeFolder.files.length} {lang === 'fa' ? 'فایل' : 'files'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 dark:text-zinc-500 block truncate">
+                        {lang === 'fa' ? 'پوشه اختصاصی شما' : 'Custom user folder'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => {
+                        setFolderToEdit(activeFolder);
+                        setIsFolderModalOpen(true);
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-sky-400 text-xs font-semibold flex items-center gap-1 transition cursor-pointer active:scale-95"
+                      title={t('editFolder')}
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">{t('editFolder')}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveFolderId(null)}
+                      className="p-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 dark:bg-zinc-800 dark:hover:bg-rose-950/40 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer active:scale-90"
+                      title={t('exitFolder')}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Quick Channels & Chats Switcher Bar (Main Page & Mobile) */}
-              {activeTab === 'files' && <ChatQuickSwitcher />}
+              {activeTab === 'files' && !activeFolder && <ChatQuickSwitcher />}
 
               {/* Category & Format Filters */}
               <QuickFilters />
 
-              {/* Loading Spinner */}
-              {isLoading && activeTab === 'files' ? (
+              {/* Background refresh progress indicator when files are already loaded */}
+              {isLoading && files.length > 0 && !isPullRefreshing && activeTab === 'files' && (
+                <div className="w-full h-1 bg-blue-500/10 dark:bg-blue-400/10 rounded-full overflow-hidden mb-3 animate-in fade-in duration-200">
+                  <div className="h-full bg-blue-600 dark:bg-sky-400 rounded-full animate-pulse w-full" />
+                </div>
+              )}
+
+              {/* Loading Spinner: Only shown on cold load when there are no files in memory and not pull-to-refreshing */}
+              {isLoading && files.length === 0 && !isPullRefreshing && activeTab === 'files' ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
                   <RotateCw className="w-8 h-8 text-blue-500 animate-spin mb-3" />
                   <p className="text-xs font-semibold text-slate-500 dark:text-zinc-400">
@@ -367,11 +490,13 @@ function TeleCloudApp() {
                 </div>
               ) : (
                 <>
-                  {viewMode === 'grid' ? (
-                    <FileGrid files={filteredFiles} />
-                  ) : (
-                    <FileList files={filteredFiles} />
-                  )}
+                  <div key={activePeer} className="transition-all duration-200 animate-in fade-in">
+                    {viewMode === 'grid' ? (
+                      <FileGrid files={filteredFiles} />
+                    ) : (
+                      <FileList files={filteredFiles} />
+                    )}
+                  </div>
 
                   {/* Infinite Scroll Sentinel & Channel Pagination Bar */}
                   {hasMoreFiles && activeTab === 'files' && (
@@ -460,7 +585,11 @@ function TeleCloudApp() {
         <TelegramLinkModal onClose={() => setIsTelegramLinkModalOpen(false)} />
       )}
 
+      <FolderModal />
+      <AddToFolderModal />
+
       <AccountSwitcherDrawer />
+      <PWAInstallBanner />
 
       {/* Action / Permission Error Floating Toast */}
       {actionError && (
