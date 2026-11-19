@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Lock,
-  Key,
   ShieldCheck,
   ArrowRight,
   Loader2,
@@ -9,12 +7,9 @@ import {
   EyeOff,
   Sun,
   Moon,
-  Globe,
   Settings,
   ChevronDown,
   ChevronUp,
-  HelpCircle,
-  CheckCircle2,
 } from 'lucide-react';
 import { useTelegram } from '../context/TelegramContext';
 import { useTheme } from '../context/ThemeContext';
@@ -25,12 +20,11 @@ export function WebAppAuthModal() {
     webLogin,
     webSetup,
     serverDefaultApiId,
-    hasServerDefaultApiHash,
   } = useTelegram();
   const { t, lang, setLang, isDark, toggleTheme } = useTheme();
 
   // Mode: if app is not configured yet, force setup mode; otherwise login mode
-  const [isSetupMode, setIsSetupMode] = useState(!isAppConfigured);
+  const [isSetupMode] = useState(!isAppConfigured);
 
   // Form states
   const [username, setUsername] = useState('');
@@ -101,19 +95,22 @@ export function WebAppAuthModal() {
     }
   };
 
-  const isRtl = lang === 'fa';
-
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="w-full max-w-md my-auto bg-white dark:bg-[#18191c] rounded-3xl shadow-2xl border border-slate-200/90 dark:border-zinc-800 p-6 sm:p-8 relative transition-all">
+    <div className="fixed inset-0 z-50 bg-[#F4F6FA] dark:bg-[#090B10] bg-vault-grid flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,rgba(37,99,235,0.12),transparent_55%)] dark:bg-[radial-gradient(ellipse_at_top,rgba(56,189,248,0.10),transparent_55%)]"
+      />
+
+      <div className="w-full max-w-md my-auto bg-white dark:bg-[#11141C] rounded-3xl shadow-2xl shadow-slate-900/10 dark:shadow-black/60 border border-slate-200/80 dark:border-white/[0.08] p-6 sm:p-8 relative transition-all">
         {/* Top Controls: Language & Theme */}
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-2xl bg-blue-50 dark:bg-sky-950/40 border border-blue-100 dark:border-sky-800/50 flex items-center justify-center text-blue-600 dark:text-sky-400 shadow-xs">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-500/10 border border-blue-100 dark:border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-sky-400">
               <ShieldCheck className="w-5 h-5" />
             </div>
-            <span className="text-xs font-black tracking-wider uppercase text-blue-600 dark:text-sky-400">
-              TeleCloud Security
+            <span className="text-xs font-bold tracking-wide text-blue-600 dark:text-sky-400">
+              TeleCloud Vault
             </span>
           </div>
 
@@ -122,7 +119,7 @@ export function WebAppAuthModal() {
             <button
               type="button"
               onClick={() => setLang(lang === 'fa' ? 'en' : 'fa')}
-              className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-[11px] font-bold text-slate-700 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-zinc-700 transition cursor-pointer"
+              className="min-h-[36px] px-3 py-1.5 rounded-xl bg-[#F4F6FA] dark:bg-[#171B26] border border-slate-200/70 dark:border-white/[0.08] text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#232938] transition cursor-pointer whitespace-nowrap"
             >
               {lang === 'fa' ? 'English' : 'فارسی'}
             </button>
@@ -131,7 +128,7 @@ export function WebAppAuthModal() {
             <button
               type="button"
               onClick={(e) => toggleTheme(e)}
-              className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center text-slate-700 dark:text-zinc-200 hover:bg-slate-200 dark:hover:bg-zinc-700 transition cursor-pointer"
+              className="w-9 h-9 rounded-xl bg-[#F4F6FA] dark:bg-[#171B26] border border-slate-200/70 dark:border-white/[0.08] flex items-center justify-center text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#232938] transition cursor-pointer shrink-0"
               aria-label="Toggle theme"
             >
               {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
@@ -141,15 +138,15 @@ export function WebAppAuthModal() {
 
         {/* Header Branding */}
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="w-16 h-16 rounded-3xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center shadow-lg mb-3.5 overflow-hidden p-2.5">
+          <div className="w-16 h-16 rounded-2xl bg-[#F4F6FA] dark:bg-[#171B26] border border-slate-200/80 dark:border-white/[0.08] flex items-center justify-center shadow-sm mb-4 overflow-hidden p-2.5">
             <img src="/favicon-96x96.png" alt="Logo" className="w-full h-full object-contain" />
           </div>
 
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-zinc-100">
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
             {isSetupMode ? t('webAuthSetupTitle') : t('webAuthTitle')}
           </h2>
 
-          <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1.5 max-w-xs leading-relaxed">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1.5 max-w-xs leading-relaxed">
             {isSetupMode
               ? (lang === 'fa'
                   ? 'برای امنیت فضای ابری، لطفاً نام کاربری و رمز عبور اصلی برنامه را تعیین کنید.'
@@ -162,7 +159,7 @@ export function WebAppAuthModal() {
 
         {/* Error Alert */}
         {error && (
-          <div className="p-3 mb-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-300 text-xs text-center font-medium animate-in fade-in duration-200">
+          <div className="p-3 mb-4 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/25 text-rose-700 dark:text-rose-300 text-xs text-center font-medium animate-in fade-in duration-200">
             {error}
           </div>
         )}
@@ -170,7 +167,7 @@ export function WebAppAuthModal() {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
               {t('usernameLabel')}
             </label>
             <input
@@ -180,12 +177,12 @@ export function WebAppAuthModal() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder={isSetupMode ? (lang === 'fa' ? 'مثال: admin یا نام دلخواه' : 'e.g. admin or your name') : 'admin'}
-              className="w-full h-11 px-4 rounded-xl bg-slate-50 hover:bg-white focus:bg-white dark:bg-zinc-800/90 dark:hover:bg-zinc-800 dark:focus:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-sm text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 caret-blue-600 dark:caret-sky-400 outline-none focus:border-blue-500 dark:focus:border-sky-500 transition"
+              className="w-full h-11 px-4 rounded-xl bg-[#F4F6FA] hover:bg-white focus:bg-white dark:bg-[#171B26] dark:hover:bg-[#1C212E] dark:focus:bg-[#1C212E] border border-slate-200/80 dark:border-white/[0.08] text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 caret-blue-600 dark:caret-sky-400 outline-none focus:border-blue-500 dark:focus:border-sky-400 transition"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
               {t('passwordLabel')}
             </label>
             <div className="relative">
@@ -195,12 +192,12 @@ export function WebAppAuthModal() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full h-11 px-4 pe-11 rounded-xl bg-slate-50 hover:bg-white focus:bg-white dark:bg-zinc-800/90 dark:hover:bg-zinc-800 dark:focus:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-sm text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 caret-blue-600 dark:caret-sky-400 outline-none focus:border-blue-500 dark:focus:border-sky-500 transition font-mono"
+                className="w-full h-11 px-4 pe-11 rounded-xl bg-[#F4F6FA] hover:bg-white focus:bg-white dark:bg-[#171B26] dark:hover:bg-[#1C212E] dark:focus:bg-[#1C212E] border border-slate-200/80 dark:border-white/[0.08] text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 caret-blue-600 dark:caret-sky-400 outline-none focus:border-blue-500 dark:focus:border-sky-400 transition font-mono"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 end-0 px-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition"
+                className="absolute inset-y-0 end-0 px-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
                 tabIndex={-1}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -211,7 +208,7 @@ export function WebAppAuthModal() {
           {/* Confirm Password (Setup mode only) */}
           {isSetupMode && (
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                 {t('confirmPasswordLabel')}
               </label>
               <div className="relative">
@@ -221,12 +218,12 @@ export function WebAppAuthModal() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full h-11 px-4 pe-11 rounded-xl bg-slate-50 hover:bg-white focus:bg-white dark:bg-zinc-800/90 dark:hover:bg-zinc-800 dark:focus:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-sm text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-500 caret-blue-600 dark:caret-sky-400 outline-none focus:border-blue-500 dark:focus:border-sky-500 transition font-mono"
+                  className="w-full h-11 px-4 pe-11 rounded-xl bg-[#F4F6FA] hover:bg-white focus:bg-white dark:bg-[#171B26] dark:hover:bg-[#1C212E] dark:focus:bg-[#1C212E] border border-slate-200/80 dark:border-white/[0.08] text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 caret-blue-600 dark:caret-sky-400 outline-none focus:border-blue-500 dark:focus:border-sky-400 transition font-mono"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 end-0 px-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 transition"
+                  className="absolute inset-y-0 end-0 px-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition cursor-pointer"
                   tabIndex={-1}
                 >
                   {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -241,10 +238,10 @@ export function WebAppAuthModal() {
               <button
                 type="button"
                 onClick={() => setShowApiSettings(!showApiSettings)}
-                className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/60 border border-slate-200 dark:border-zinc-700/80 text-xs font-semibold text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                className="w-full min-h-[42px] flex items-center justify-between p-3 rounded-xl bg-[#F4F6FA] dark:bg-[#171B26] border border-slate-200/80 dark:border-white/[0.08] text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1C212E] transition cursor-pointer"
               >
                 <div className="flex items-center gap-2">
-                  <Settings className="w-3.5 h-3.5 text-blue-500" />
+                  <Settings className="w-3.5 h-3.5 text-blue-600 dark:text-sky-400" />
                   <span>
                     {lang === 'fa' ? 'تنظیمات پیش‌فرض API تلگرام (اختیاری)' : 'Default Telegram API Credentials (Optional)'}
                   </span>
@@ -253,15 +250,15 @@ export function WebAppAuthModal() {
               </button>
 
               {showApiSettings && (
-                <div className="mt-2.5 p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-900/60 border border-slate-200/90 dark:border-zinc-800 space-y-3 animate-in fade-in duration-150">
-                  <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed">
+                <div className="mt-2.5 p-3.5 rounded-xl bg-[#F4F6FA] dark:bg-[#171B26] border border-slate-200/80 dark:border-white/[0.08] space-y-3 animate-in fade-in duration-150">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
                     {lang === 'fa'
                       ? 'اگر مایلید می‌توانید شناسه API ID و API Hash رسمی تلگرام خود را همینجا تنظیم کنید تا برای تمام اکانت‌ها خودکار استفاده شود (یا بعداً در فرم ورود تلگرام وارد نمایید).'
                       : 'Optionally save your Telegram API ID & Hash so you don\'t have to re-enter them on every login (from my.telegram.org).'}
                   </p>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-zinc-400 mb-1">
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                       {t('apiIdLabel')}
                     </label>
                     <input
@@ -269,12 +266,12 @@ export function WebAppAuthModal() {
                       value={apiId}
                       onChange={(e) => setApiId(e.target.value)}
                       placeholder="1234567"
-                      className="w-full h-10 px-3.5 rounded-lg bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-slate-900 dark:text-zinc-100 outline-none focus:border-blue-500 transition"
+                      className="w-full h-10 px-3.5 rounded-xl bg-white dark:bg-[#11141C] border border-slate-200/80 dark:border-white/[0.08] text-xs font-mono text-slate-900 dark:text-slate-100 outline-none focus:border-blue-500 dark:focus:border-sky-400 transition"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-zinc-400 mb-1">
+                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
                       {t('apiHashLabel')}
                     </label>
                     <input
@@ -282,7 +279,7 @@ export function WebAppAuthModal() {
                       value={apiHash}
                       onChange={(e) => setApiHash(e.target.value)}
                       placeholder="a1b2c3d4e5f6..."
-                      className="w-full h-10 px-3.5 rounded-lg bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-xs font-mono text-slate-900 dark:text-zinc-100 outline-none focus:border-blue-500 transition"
+                      className="w-full h-10 px-3.5 rounded-xl bg-white dark:bg-[#11141C] border border-slate-200/80 dark:border-white/[0.08] text-xs font-mono text-slate-900 dark:text-slate-100 outline-none focus:border-blue-500 dark:focus:border-sky-400 transition"
                     />
                   </div>
                 </div>
@@ -294,7 +291,7 @@ export function WebAppAuthModal() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full h-12 mt-3 rounded-2xl bg-gradient-to-r from-blue-600 via-sky-500 to-blue-600 hover:from-blue-700 hover:via-sky-600 hover:to-blue-700 text-white text-sm font-bold shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition disabled:opacity-50 active:scale-[0.98] cursor-pointer"
+            className="w-full h-12 mt-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-sm shadow-blue-600/20 flex items-center justify-center gap-2 transition disabled:opacity-50 active:scale-[0.98] cursor-pointer"
           >
             {isLoading ? (
               <Loader2 className="w-4.5 h-4.5 animate-spin" />
@@ -308,11 +305,11 @@ export function WebAppAuthModal() {
         </form>
 
         {/* Footer info */}
-        <div className="mt-6 pt-4 border-t border-slate-100 dark:border-zinc-800/80 text-center">
-          <p className="text-[11px] text-slate-400 dark:text-zinc-500">
+        <div className="mt-6 pt-4 border-t border-slate-100 dark:border-white/[0.06] text-center">
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">
             {lang === 'fa'
-              ? 'تله‌کلاد • درایو ابری نامحدود با امنیت سشن درون‌حافظه‌ای'
-              : 'TeleCloud • Unlimited Cloud Drive with In-Memory Security'}
+              ? 'تله‌کلاد · درایو ابری نامحدود با امنیت سشن درون‌حافظه‌ای'
+              : 'TeleCloud · Unlimited Cloud Drive with In-Memory Security'}
           </p>
         </div>
       </div>

@@ -72,49 +72,52 @@ export function MobileBottomNav() {
   };
 
   return (
-    <div className="md:hidden fixed bottom-3 inset-x-3 max-w-md mx-auto z-30 bg-white/75 dark:bg-[#16171b]/75 backdrop-blur-2xl border border-white/60 dark:border-white/10 rounded-3xl px-1.5 py-1.5 flex items-center justify-around shadow-[0_10px_35px_rgba(0,0,0,0.15)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.6)] select-none transition-all">
-      {/* 1. All Files / Drive Home */}
+    <nav
+      aria-label="Mobile Navigation"
+      className="md:hidden fixed bottom-2.5 inset-x-3 max-w-md mx-auto z-30 bg-white/90 dark:bg-[#11141C]/92 backdrop-blur-2xl border border-slate-200/80 dark:border-white/[0.08] rounded-2xl px-1.5 py-1 flex items-center justify-around shadow-[0_12px_32px_rgba(15,23,42,0.12)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.65)] select-none"
+    >
+      {/* 1. All Files */}
       <button
         onClick={handleGoFiles}
-        className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all active:scale-95 cursor-pointer min-h-[42px] ${
+        className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all duration-150 active:scale-95 cursor-pointer min-h-[44px] ${
           activeTab === 'files'
-            ? 'text-blue-600 dark:text-sky-400 font-bold bg-blue-50/80 dark:bg-sky-500/15'
-            : 'text-slate-500 dark:text-zinc-400 font-medium hover:text-slate-700 dark:hover:text-zinc-200'
+            ? 'text-blue-600 dark:text-sky-400 font-bold bg-blue-50/80 dark:bg-sky-500/12'
+            : 'text-slate-500 dark:text-slate-400 font-medium hover:text-slate-800 dark:hover:text-slate-200'
         }`}
       >
-        <Folder className={`w-4.5 h-4.5 ${activeTab === 'files' ? 'fill-blue-500/20' : ''}`} />
-        <span className="text-[10px] mt-0.5 font-semibold truncate">{t('allFiles')}</span>
+        <Folder className={`w-4.5 h-4.5 ${activeTab === 'files' ? 'fill-blue-500/15' : ''}`} />
+        <span className="text-[10px] mt-0.5 truncate">{t('allFiles')}</span>
       </button>
 
-      {/* 2. Favorites / Starred */}
+      {/* 2. Favorites */}
       <button
         onClick={handleGoFavorites}
-        className={`flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl transition-all active:scale-95 cursor-pointer min-h-[42px] ${
+        className={`flex-1 flex flex-col items-center justify-center py-1 px-0.5 rounded-xl transition-all duration-150 active:scale-95 cursor-pointer min-h-[44px] ${
           activeTab === 'favorites'
-            ? 'text-amber-500 dark:text-amber-400 font-bold bg-amber-50/80 dark:bg-amber-500/15'
-            : 'text-slate-500 dark:text-zinc-400 font-medium hover:text-amber-500 dark:hover:text-amber-400'
+            ? 'text-amber-600 dark:text-amber-400 font-bold bg-amber-50/80 dark:bg-amber-500/12'
+            : 'text-slate-500 dark:text-slate-400 font-medium hover:text-amber-500 dark:hover:text-amber-400'
         }`}
       >
         <div className="relative">
           <Star className={`w-4.5 h-4.5 ${activeTab === 'favorites' ? 'fill-amber-500 text-amber-500' : ''}`} />
           {favoriteFileIds.length > 0 && (
-            <span className="absolute -top-1 -end-1.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-amber-500 text-slate-950 font-mono text-[9px] font-black flex items-center justify-center">
+            <span className="absolute -top-1 -end-1.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-amber-500 text-slate-950 font-mono text-[9px] font-bold flex items-center justify-center tabular-nums">
               {favoriteFileIds.length > 99 ? '99+' : favoriteFileIds.length}
             </span>
           )}
         </div>
-        <span className="text-[10px] mt-0.5 font-semibold truncate">{t('favorites')}</span>
+        <span className="text-[10px] mt-0.5 truncate">{t('favorites')}</span>
       </button>
 
-      {/* 3. Center Hero Action: Instant Upload (In any writable chat: Saved, Bot, PV, Admin Channel, Accessible Group) */}
+      {/* 3. Primary Upload Action */}
       {canUploadInActiveChat && (
         <div className="flex-1 flex justify-center">
           <button
             onClick={() => setIsUploadModalOpen(true)}
             aria-label={t('upload')}
-            className="w-11 h-11 -my-1 rounded-2xl bg-gradient-to-tr from-blue-600 via-sky-500 to-indigo-600 text-white shadow-lg shadow-blue-500/35 flex items-center justify-center active:scale-90 transition-transform border-2 border-white/60 dark:border-white/10 cursor-pointer shrink-0"
+            className="w-11 h-11 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 flex items-center justify-center active:scale-90 transition-transform cursor-pointer shrink-0"
           >
-            <Plus className="w-5 h-5 stroke-[2.5]" />
+            <Plus className="w-5 h-5 stroke-[2.25]" />
           </button>
         </div>
       )}
@@ -122,15 +125,15 @@ export function MobileBottomNav() {
       {/* 4. Telegram Link Inspector */}
       <button
         onClick={() => setIsTelegramLinkModalOpen(true)}
-        className="flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl text-slate-500 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-sky-400 font-medium transition-all active:scale-95 cursor-pointer min-h-[42px]"
+        className="flex-1 flex flex-col items-center justify-center py-1 px-0.5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-sky-400 font-medium transition-all duration-150 active:scale-95 cursor-pointer min-h-[44px]"
       >
-        <Link2 className="w-4.5 h-4.5 text-blue-500" />
-        <span className="text-[10px] mt-0.5 font-semibold truncate">
-          {lang === 'fa' ? 'لینک به فایل' : 'Link to File'}
+        <Link2 className="w-4.5 h-4.5 text-blue-600 dark:text-sky-400" />
+        <span className="text-[10px] mt-0.5 truncate">
+          {lang === 'fa' ? 'لینک به فایل' : 'Link'}
         </span>
       </button>
 
-      {/* 4. Account Information / Profile Page */}
+      {/* 5. Account */}
       <button
         onClick={handleGoAccount}
         onTouchStart={handleAccountTouchStart}
@@ -143,19 +146,17 @@ export function MobileBottomNav() {
           e.preventDefault();
           setIsAccountDrawerOpen(true);
         }}
-        className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer min-h-[42px] ${
-          isAccountDrawerOpen
-            ? 'text-blue-600 dark:text-sky-400 font-bold bg-blue-500/15 scale-105'
-            : activeTab === 'account'
-            ? 'text-blue-600 dark:text-sky-400 font-bold bg-blue-50/80 dark:bg-sky-500/15'
-            : 'text-slate-500 dark:text-zinc-400 font-medium hover:text-slate-700 dark:hover:text-zinc-200'
+        className={`flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all duration-150 active:scale-95 cursor-pointer min-h-[44px] ${
+          isAccountDrawerOpen || activeTab === 'account'
+            ? 'text-blue-600 dark:text-sky-400 font-bold bg-blue-50/80 dark:bg-sky-500/12'
+            : 'text-slate-500 dark:text-slate-400 font-medium hover:text-slate-800 dark:hover:text-slate-200'
         }`}
       >
         <div className="relative">
           {isConnected && user ? (
             <div
-              className={`w-5 h-5 rounded-full overflow-hidden bg-gradient-to-tr from-blue-600 to-sky-400 text-white flex items-center justify-center font-bold text-[10px] transition-transform duration-200 ${
-                isAccountDrawerOpen ? 'ring-2 ring-sky-400 scale-110' : ''
+              className={`w-5 h-5 rounded-full overflow-hidden bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] transition-transform duration-150 ${
+                isAccountDrawerOpen ? 'ring-2 ring-sky-400 scale-105' : ''
               }`}
             >
               {user.photoUrl ? (
@@ -165,7 +166,7 @@ export function MobileBottomNav() {
               )}
             </div>
           ) : (
-            <User className={`w-4.5 h-4.5 ${activeTab === 'account' || isAccountDrawerOpen ? 'fill-blue-500/20' : ''}`} />
+            <User className={`w-4.5 h-4.5 ${activeTab === 'account' || isAccountDrawerOpen ? 'fill-blue-500/15' : ''}`} />
           )}
 
           {user?.isPremium && (
@@ -174,10 +175,8 @@ export function MobileBottomNav() {
             </div>
           )}
         </div>
-        <span className="text-[10px] mt-0.5 font-semibold truncate">{t('account')}</span>
+        <span className="text-[10px] mt-0.5 truncate">{t('account')}</span>
       </button>
-    </div>
+    </nav>
   );
 }
-
-

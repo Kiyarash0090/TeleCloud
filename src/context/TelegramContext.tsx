@@ -303,7 +303,9 @@ interface TelegramContextType {
   setQuickFilter: (filter: 'all' | 'channel' | 'group' | 'user') => void;
   filteredChats: TelegramChat[];
   fetchChats: (forceRefresh?: boolean) => Promise<TelegramChat[]>;
-  switchToNextChat: (direction: 'next' | 'prev') => void;
+  switchToNextChat: (direction: 'next' | 'prev', dragOffsetX?: number) => void;
+  chatSlideDirection: 'left' | 'right' | null;
+  chatTransitionId: number;
 
   // Mobile Back Button, Double-Back-to-Exit & Action Toast
   showExitToast: boolean;
@@ -354,6 +356,8 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
   const [isActiveChatAdmin, setIsActiveChatAdmin] = useState<boolean>(true);
   const [activeChatType, setActiveChatType] = useState<TelegramChat['type']>('saved');
   const [isChatSelectorOpen, setIsChatSelectorOpen] = useState(false);
+  const [chatSlideDirection, setChatSlideDirection] = useState<'left' | 'right' | null>(null);
+  const [chatTransitionId, setChatTransitionId] = useState(0);
   const [actionToast, setActionToast] = useState<string | null>(null);
   const actionToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -520,8 +524,11 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
     });
   }, [chats, quickFilter, lang]);
 
+  const activePeerAndChatsRef = useRef({ activePeer, filteredChats });
+  activePeerAndChatsRef.current = { activePeer, filteredChats };
+
   const switchToNextChat = useCallback(
-    (direction: 'next' | 'prev') => {
+    (direction: 'next' | 'prev', dragOffsetX: number = 0) => {
       const list = filteredChats;
       if (!list || list.length <= 1) return;
 
@@ -543,6 +550,18 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
 
       const targetChat = list[targetIndex];
       if (!targetChat) return;
+
+      // In LTR tab strip: 'next' moves RIGHT in tabs -> page slides LEFT; 'prev' moves LEFT in tabs -> page slides RIGHT
+      const slideDir: 'left' | 'right' = direction === 'next' ? 'left' : 'right';
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('telecloud-before-chat-switch', {
+            detail: { direction: slideDir, startOffsetX: dragOffsetX },
+          })
+        );
+      }
+      setChatSlideDirection(slideDir);
+      setChatTransitionId((prev) => prev + 1);
 
       setActivePeerState(targetChat.id);
       setActiveChatTitle(
@@ -1043,6 +1062,35 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
   const setActivePeer = useCallback(
     (id: string, title: string, chatMeta?: Partial<TelegramChat>) => {
       const targetId = id || 'me';
+      const { activePeer: currentPeer, filteredChats: currentList } = activePeerAndChatsRef.current;
+      const isCurrentSaved = !currentPeer || currentPeer === 'me';
+      const isTargetSaved = targetId === 'me' || targetId === 'self';
+
+      if (!((isCurrentSaved && isTargetSaved) || currentPeer === targetId)) {
+        const oldIdx = currentList.findIndex(
+          (c) => (c.id === 'me' && isCurrentSaved) || c.id === currentPeer
+        );
+        const newIdx = currentList.findIndex(
+          (c) => (c.id === 'me' && isTargetSaved) || c.id === targetId
+        );
+        // LTR tab order (0 on left -> higher index on right):
+        // Clicking a tab to the right (newIdx > oldIdx) slides page LEFT;
+        // Clicking a tab to the left (newIdx < oldIdx) slides page RIGHT.
+        let slideDir: 'left' | 'right' = 'left';
+        if (oldIdx !== -1 && newIdx !== -1) {
+          slideDir = newIdx > oldIdx ? 'left' : 'right';
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('telecloud-before-chat-switch', {
+              detail: { direction: slideDir, startOffsetX: 0 },
+            })
+          );
+        }
+        setChatSlideDirection(slideDir);
+        setChatTransitionId((prev) => prev + 1);
+      }
+
       setActivePeerState(targetId);
       setActiveChatTitle(title || 'Saved Messages');
       setSelectedFileIds([]);
@@ -2409,6 +2457,8 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         filteredChats,
         fetchChats,
         switchToNextChat,
+        chatSlideDirection,
+        chatTransitionId,
         showExitToast,
         actionToast,
         actionError: actionToast,

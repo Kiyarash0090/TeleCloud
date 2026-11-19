@@ -67,21 +67,21 @@ export function StorageStatsBar() {
   ];
 
   return (
-    <div className="mb-3 sm:mb-5 p-3 sm:p-5 rounded-2xl bg-white dark:bg-[#1e1f20] border border-slate-200/80 dark:border-zinc-800/80 shadow-xs select-none">
+    <div className="mb-3 sm:mb-5 p-3.5 sm:p-5 rounded-2xl bg-white dark:bg-[#11141C] border border-slate-200/80 dark:border-white/[0.08] shadow-[var(--shadow-card)] select-none">
       <div
         onClick={() => setExpandedMobile(!expandedMobile)}
         className="flex items-center justify-between gap-2 cursor-pointer sm:cursor-default"
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 flex items-center justify-center text-blue-600 dark:text-sky-400 shrink-0">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 dark:bg-blue-500/15 flex items-center justify-center text-blue-600 dark:text-sky-400 shrink-0">
             <HardDrive className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
               {t('storageUsed')}
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-zinc-400 truncate font-mono">
-              {stats.totalFiles} {lang === 'fa' ? 'فایل' : 'files'} •{' '}
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate font-mono tabular-nums">
+              {stats.totalFiles} {lang === 'fa' ? 'فایل' : 'files'} ·{' '}
               <span className="font-bold text-blue-600 dark:text-sky-400">
                 {formatFileSize(stats.totalSize)}
               </span>
@@ -91,7 +91,7 @@ export function StorageStatsBar() {
 
         <button
           type="button"
-          className="sm:hidden p-1.5 rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400"
+          className="sm:hidden p-1.5 rounded-lg bg-slate-100 dark:bg-[#171B26] text-slate-500 dark:text-slate-400"
           aria-label="Toggle storage details"
         >
           {expandedMobile ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -99,7 +99,7 @@ export function StorageStatsBar() {
       </div>
 
       {/* Multi-segment bar */}
-      <div className="w-full h-2 sm:h-2.5 bg-slate-100 dark:bg-zinc-800 rounded-full overflow-hidden flex gap-0.5 mt-2.5 sm:mt-3.5">
+      <div className="w-full h-2 sm:h-2.5 bg-slate-100 dark:bg-[#171B26] rounded-full overflow-hidden flex gap-0.5 mt-2.5 sm:mt-3.5">
         {items.map((s) => {
           const pct = Math.max((s.size / totalSize) * 100, s.count > 0 ? 4 : 0);
           if (pct === 0) return null;
@@ -117,7 +117,7 @@ export function StorageStatsBar() {
       {/* Category breakdown cards - collapsible on mobile */}
       <div
         className={`${
-          expandedMobile ? 'grid mt-3 pt-2.5 border-t border-slate-100 dark:border-zinc-800' : 'hidden sm:grid sm:mt-4'
+          expandedMobile ? 'grid mt-3 pt-2.5 border-t border-slate-100 dark:border-white/[0.06]' : 'hidden sm:grid sm:mt-4'
         } grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-2.5`}
       >
         {items.map((s) => {
@@ -125,16 +125,16 @@ export function StorageStatsBar() {
           return (
             <div
               key={s.id}
-              className="flex items-center gap-2 p-2 rounded-xl bg-slate-50/80 dark:bg-zinc-800/40 border border-slate-100 dark:border-zinc-800/60"
+              className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50/90 dark:bg-[#171B26] border border-slate-200/60 dark:border-white/[0.06]"
             >
               <div className={`w-7 h-7 rounded-lg ${s.bgLight} ${s.textColor} flex items-center justify-center shrink-0`}>
                 <Icon className="w-3.5 h-3.5" />
               </div>
               <div className="min-w-0">
-                <div className="text-[11px] font-bold text-slate-800 dark:text-zinc-200 truncate">
+                <div className="text-[11px] font-semibold text-slate-800 dark:text-slate-200 truncate">
                   {s.label} ({s.count})
                 </div>
-                <div className="text-[10px] font-mono text-slate-400 dark:text-zinc-500">
+                <div className="text-[10px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
                   {formatFileSize(s.size)}
                 </div>
               </div>

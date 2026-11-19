@@ -344,20 +344,20 @@ export function ImageViewerModal({
       {/* ----------------- Top Header Bar (Glassmorphic) ----------------- */}
       <div className="p-3 sm:p-5 pt-2 sm:pt-[max(0.75rem,env(safe-area-inset-top))] bg-gradient-to-b from-black/85 via-black/40 to-transparent backdrop-blur-[2px] flex items-center justify-between gap-2 text-white z-40">
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-rose-500/20 to-pink-500/20 text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/30 shadow-inner backdrop-blur-md">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-rose-500/15 text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/25 backdrop-blur-md">
             <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <h3 className="text-xs sm:text-sm font-bold truncate max-w-[140px] xs:max-w-[200px] sm:max-w-md md:max-w-xl text-zinc-100">{file.filename}</h3>
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white/10 text-zinc-300 border border-white/10 shrink-0 font-mono backdrop-blur-md">
-                {currentIndex + 1} / {imageFiles.length}
+              <h3 className="text-xs sm:text-sm font-bold truncate max-w-[140px] xs:max-w-[200px] sm:max-w-md md:max-w-xl text-slate-100" dir="auto">{file.filename}</h3>
+              <span className="text-[11px] font-mono tabular-nums text-slate-300 shrink-0" dir="ltr">
+                · {currentIndex + 1} / {imageFiles.length}
               </span>
             </div>
-            <p className="text-[10px] sm:text-xs text-zinc-400 font-mono mt-0.5 flex items-center gap-1.5 sm:gap-2 truncate">
+            <p className="text-[10px] sm:text-xs text-slate-400 font-mono tabular-nums mt-0.5 flex items-center gap-1.5 sm:gap-2 truncate">
               <span>{formatFileSize(file.size)}</span>
-              {Boolean(file.width && file.height) && <span className="hidden xs:inline">• {file.width}×{file.height}px</span>}
-              <span>• {formatDate(file.date, lang)}</span>
+              {Boolean(file.width && file.height) && <span className="hidden xs:inline">· {file.width}×{file.height}px</span>}
+              <span>· {formatDate(file.date, lang)}</span>
             </p>
           </div>
         </div>
@@ -368,19 +368,19 @@ export function ImageViewerModal({
           <button
             onClick={() => setShowFilters(!showFilters)}
             title="تنظیمات نور و رنگ (Filters Studio)"
-            className={`p-2 sm:p-2.5 rounded-full transition backdrop-blur-md relative border ${
-              showFilters || hasCustomFilters ? 'bg-rose-500/30 text-rose-300 border-rose-500/50' : 'bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white border-white/10'
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition backdrop-blur-md relative border cursor-pointer ${
+              showFilters || hasCustomFilters ? 'bg-rose-500/25 text-rose-300 border-rose-500/45' : 'bg-[#11141C]/75 hover:bg-[#171B26] text-slate-200 hover:text-white border-white/15'
             }`}
           >
             <Sliders className="w-4 h-4" />
-            {hasCustomFilters && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-black" />}
+            {hasCustomFilters && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-[#11141C]" />}
           </button>
 
           {/* Copy Direct Link */}
           <button
             onClick={handleCopyLink}
             title={t('copyDirectLink')}
-            className="p-2 sm:p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white transition backdrop-blur-md border border-white/10"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#11141C]/75 hover:bg-[#171B26] text-slate-200 hover:text-white flex items-center justify-center transition backdrop-blur-md border border-white/15 cursor-pointer"
           >
             {isCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
           </button>
@@ -390,7 +390,7 @@ export function ImageViewerModal({
             href={imageUrl}
             download={file.filename}
             title={t('directDownload')}
-            className="p-2 sm:p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white transition backdrop-blur-md border border-white/10"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#11141C]/75 hover:bg-[#171B26] text-slate-200 hover:text-white flex items-center justify-center transition backdrop-blur-md border border-white/15"
           >
             <Download className="w-4 h-4" />
           </a>
@@ -399,7 +399,7 @@ export function ImageViewerModal({
           <button
             onClick={toggleFullscreen}
             title={isFullscreen ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'}
-            className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white transition backdrop-blur-md hidden sm:flex border border-white/10"
+            className="w-10 h-10 rounded-full bg-[#11141C]/75 hover:bg-[#171B26] text-slate-200 hover:text-white transition backdrop-blur-md hidden sm:flex items-center justify-center border border-white/15 cursor-pointer"
           >
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
           </button>
@@ -407,31 +407,32 @@ export function ImageViewerModal({
           {/* Close */}
           <button
             onClick={onClose}
-            className="p-2 sm:p-2.5 rounded-full bg-white/10 hover:bg-rose-600 text-zinc-300 hover:text-white transition backdrop-blur-md border border-white/10"
+            aria-label="Close"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#11141C]/75 hover:bg-rose-600 text-slate-200 hover:text-white flex items-center justify-center transition backdrop-blur-md border border-white/15 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* ----------------- Filters Drawer Popover (Glassmorphic) ----------------- */}
+      {/* ----------------- Filters Drawer Popover ----------------- */}
       {showFilters && (
-        <div className="absolute inset-x-3 bottom-20 sm:bottom-auto sm:top-20 sm:inset-x-auto sm:end-6 sm:w-72 rounded-2xl sm:rounded-3xl bg-zinc-950/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/20 p-4 z-40 text-white shadow-[0_16px_45px_rgba(0,0,0,0.65)] animate-in fade-in slide-in-from-bottom-3 sm:slide-in-from-top-3 duration-200 flex flex-col gap-3 ring-1 ring-white/10">
-          <div className="flex items-center justify-between pb-2 border-b border-white/10">
-            <span className="text-xs font-bold flex items-center gap-1.5 text-zinc-200">
+        <div className="absolute inset-x-3 bottom-20 sm:bottom-auto sm:top-20 sm:inset-x-auto sm:end-6 sm:w-72 rounded-2xl sm:rounded-3xl bg-[#11141C]/90 backdrop-blur-2xl border border-white/15 p-4 z-40 text-white shadow-2xl animate-in fade-in slide-in-from-bottom-3 sm:slide-in-from-top-3 duration-200 flex flex-col gap-3">
+          <div className="flex items-center justify-between pb-2.5 border-b border-white/[0.08]">
+            <span className="text-xs font-bold flex items-center gap-1.5 text-slate-100">
               <Sparkles className="w-3.5 h-3.5 text-rose-400" />
               استودیو فیلتر تصویر
             </span>
             <div className="flex items-center gap-2">
               <button 
                 onClick={resetFilters} 
-                className="text-[10px] text-rose-400 hover:text-rose-300 font-medium px-2 py-0.5 rounded bg-rose-500/10"
+                className="text-[10px] text-rose-400 hover:text-rose-300 font-semibold px-2 py-0.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 transition cursor-pointer"
               >
                 ریست فیلترها
               </button>
               <button
                 onClick={() => setShowFilters(false)}
-                className="p-1 rounded-lg bg-white/10 text-zinc-300 sm:hidden"
+                className="p-1 rounded-lg bg-white/10 text-slate-300 sm:hidden cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -440,9 +441,9 @@ export function ImageViewerModal({
 
           <div className="grid grid-cols-2 sm:flex sm:flex-col gap-2.5 text-xs">
             <div className="flex flex-col gap-1">
-              <div className="flex justify-between text-[11px] text-zinc-400">
+              <div className="flex justify-between text-[11px] text-slate-400">
                 <span>روشنایی</span>
-                <span className="font-mono">{brightness}%</span>
+                <span className="font-mono tabular-nums">{brightness}%</span>
               </div>
               <input 
                 type="range" min={30} max={200} value={brightness} 
@@ -452,9 +453,9 @@ export function ImageViewerModal({
             </div>
 
             <div className="flex flex-col gap-1">
-              <div className="flex justify-between text-[11px] text-zinc-400">
+              <div className="flex justify-between text-[11px] text-slate-400">
                 <span>کنتراست</span>
-                <span className="font-mono">{contrast}%</span>
+                <span className="font-mono tabular-nums">{contrast}%</span>
               </div>
               <input 
                 type="range" min={30} max={200} value={contrast} 
@@ -464,9 +465,9 @@ export function ImageViewerModal({
             </div>
 
             <div className="flex flex-col gap-1">
-              <div className="flex justify-between text-[11px] text-zinc-400">
+              <div className="flex justify-between text-[11px] text-slate-400">
                 <span>اشباع رنگ</span>
-                <span className="font-mono">{saturation}%</span>
+                <span className="font-mono tabular-nums">{saturation}%</span>
               </div>
               <input 
                 type="range" min={0} max={200} value={saturation} 
@@ -476,9 +477,9 @@ export function ImageViewerModal({
             </div>
 
             <div className="flex flex-col gap-1">
-              <div className="flex justify-between text-[11px] text-zinc-400">
+              <div className="flex justify-between text-[11px] text-slate-400">
                 <span>سیاه و سفید</span>
-                <span className="font-mono">{grayscale}%</span>
+                <span className="font-mono tabular-nums">{grayscale}%</span>
               </div>
               <input 
                 type="range" min={0} max={100} value={grayscale} 
@@ -488,9 +489,9 @@ export function ImageViewerModal({
             </div>
 
             <div className="flex flex-col gap-1">
-              <div className="flex justify-between text-[11px] text-zinc-400">
+              <div className="flex justify-between text-[11px] text-slate-400">
                 <span>نوستالژیک</span>
-                <span className="font-mono">{sepia}%</span>
+                <span className="font-mono tabular-nums">{sepia}%</span>
               </div>
               <input 
                 type="range" min={0} max={100} value={sepia} 
@@ -500,9 +501,9 @@ export function ImageViewerModal({
             </div>
 
             <div className="flex flex-col gap-1">
-              <div className="flex justify-between text-[11px] text-zinc-400">
+              <div className="flex justify-between text-[11px] text-slate-400">
                 <span>نگاتیو</span>
-                <span className="font-mono">{invert}%</span>
+                <span className="font-mono tabular-nums">{invert}%</span>
               </div>
               <input 
                 type="range" min={0} max={100} value={invert} 
@@ -528,7 +529,7 @@ export function ImageViewerModal({
         {currentIndex > 0 && (
           <button
             onClick={handlePrev}
-            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-zinc-950/60 hover:bg-zinc-900/80 text-white backdrop-blur-2xl border border-white/15 flex items-center justify-center transition shadow-2xl hover:scale-110 active:scale-95 ring-1 ring-white/10 cursor-pointer"
+            className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#11141C]/80 hover:bg-[#171B26] text-white backdrop-blur-2xl border border-white/15 flex items-center justify-center transition shadow-2xl hover:scale-105 active:scale-95 cursor-pointer"
             title="تصویر قبلی"
           >
             <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -539,7 +540,7 @@ export function ImageViewerModal({
         {currentIndex < imageFiles.length - 1 && (
           <button
             onClick={handleNext}
-            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-30 w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-zinc-950/60 hover:bg-zinc-900/80 text-white backdrop-blur-2xl border border-white/15 flex items-center justify-center transition shadow-2xl hover:scale-110 active:scale-95 ring-1 ring-white/10 cursor-pointer"
+            className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#11141C]/80 hover:bg-[#171B26] text-white backdrop-blur-2xl border border-white/15 flex items-center justify-center transition shadow-2xl hover:scale-105 active:scale-95 cursor-pointer"
             title="تصویر بعدی"
           >
             <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -553,22 +554,23 @@ export function ImageViewerModal({
             transform: `translate(${zoom > 1 ? panOffset.x : swipeDelta.x}px, ${zoom > 1 ? panOffset.y : swipeDelta.y}px) scale(${swipeScale}) rotate(${rotation}deg) scaleX(${isFlippedH ? -1 : 1}) scaleY(${isFlippedV ? -1 : 1})`,
           }}
         >
-          {/* Layer 1: Instant Low-Res Thumbnail Blur Placeholder (Eliminates showing old photo) */}
+          {/* Layer 1: Instant Low-Res Thumbnail Blur Placeholder */}
           {loadingState === 'loading' && (
             <div className="relative flex items-center justify-center overflow-hidden rounded-2xl">
               <img
                 src={thumbnailSrc}
                 alt=""
                 aria-hidden="true"
+                referrerPolicy="no-referrer"
                 className="max-h-[72dvh] max-w-[92vw] sm:max-w-[88vw] object-contain rounded-2xl blur-md scale-105 opacity-70 filter brightness-90 transition-opacity duration-300"
               />
               
               {/* Telegram-style Circular Loading Spinner Overlay */}
               <div className="absolute inset-0 m-auto flex flex-col items-center justify-center gap-2.5 z-20 pointer-events-none">
-                <div className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-xl border border-white/20 flex items-center justify-center shadow-2xl">
+                <div className="w-12 h-12 rounded-full bg-[#11141C]/80 backdrop-blur-xl border border-white/20 flex items-center justify-center shadow-2xl">
                   <Loader2 className="w-6 h-6 text-rose-400 animate-spin" />
                 </div>
-                <span className="text-[11px] font-bold text-zinc-200 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 shadow-lg">
+                <span className="text-[11px] font-bold text-slate-200 bg-[#11141C]/75 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 shadow-lg">
                   {lang === 'fa' ? 'درحال دریافت...' : 'Loading image...'}
                 </span>
               </div>
@@ -577,11 +579,11 @@ export function ImageViewerModal({
 
           {/* Layer 2: Error State with Retry Button */}
           {loadingState === 'error' && (
-            <div className="flex flex-col items-center justify-center p-8 rounded-3xl bg-black/60 backdrop-blur-2xl border border-rose-500/30 text-white gap-3 pointer-events-auto shadow-2xl">
-              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/30">
+            <div className="flex flex-col items-center justify-center p-8 rounded-3xl bg-[#11141C]/90 backdrop-blur-2xl border border-rose-500/30 text-white gap-3 pointer-events-auto shadow-2xl">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 text-rose-400 flex items-center justify-center border border-rose-500/30">
                 <AlertCircle className="w-6 h-6" />
               </div>
-              <p className="text-xs font-bold text-zinc-200">
+              <p className="text-xs font-bold text-slate-200">
                 {lang === 'fa' ? 'خطا در بارگذاری تصویر' : 'Failed to load image'}
               </p>
               <button
@@ -589,7 +591,7 @@ export function ImageViewerModal({
                   setLoadingState('loading');
                   setReloadKey(k => k + 1);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition active:scale-95 shadow-lg shadow-rose-600/30 cursor-pointer"
+                className="flex items-center gap-1.5 min-h-[36px] px-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition active:scale-95 shadow-sm shadow-rose-600/30 cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>{lang === 'fa' ? 'تلاش مجدد' : 'Retry'}</span>
@@ -602,6 +604,7 @@ export function ImageViewerModal({
             key={`${file.id}-${reloadKey}`}
             src={imageUrl}
             alt={file.filename}
+            referrerPolicy="no-referrer"
             style={{ filter: filterStyle }}
             onLoad={() => {
               loadedImageCache.add(imageUrl);
@@ -617,25 +620,26 @@ export function ImageViewerModal({
         </div>
       </div>
 
-      {/* ----------------- Bottom Floating Toolbar & Filmstrip (Glassmorphic) ----------------- */}
+      {/* ----------------- Bottom Floating Toolbar & Filmstrip ----------------- */}
       <div className="p-2.5 sm:p-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black/85 via-black/40 to-transparent backdrop-blur-[2px] flex flex-col items-center gap-2.5 sm:gap-3 z-40">
         
         {/* Thumbnails Filmstrip Preview */}
         {showFilmstrip && imageFiles.length > 1 && (
-          <div className="flex items-center gap-2 overflow-x-auto max-w-full px-3 py-1.5 scrollbar-none bg-zinc-950/50 backdrop-blur-xl rounded-2xl border border-white/10">
+          <div className="flex items-center gap-2 overflow-x-auto max-w-full px-3 py-1.5 scrollbar-none bg-[#11141C]/80 backdrop-blur-xl rounded-2xl border border-white/10">
             {imageFiles.map((imgFile) => (
               <button
                 key={imgFile.id}
                 onClick={() => setActiveImage(imgFile)}
                 className={`relative w-11 h-11 sm:w-12 sm:h-12 rounded-xl overflow-hidden shrink-0 border-2 transition-all duration-200 cursor-pointer ${
                   imgFile.id === file.id 
-                    ? 'border-rose-500 scale-110 shadow-[0_0_12px_rgba(244,63,94,0.6)] z-10 ring-2 ring-white/30' 
+                    ? 'border-rose-500 scale-110 shadow-[0_0_12px_rgba(244,63,94,0.5)] z-10 ring-2 ring-white/30' 
                     : 'border-white/20 opacity-60 hover:opacity-100 hover:border-white/50'
                 }`}
               >
                 <img
                   src={imgFile.thumbnailUrl || imgFile.directUrl}
                   alt={imgFile.filename}
+                  referrerPolicy="no-referrer"
                   className="w-full h-full object-cover"
                 />
               </button>
@@ -643,13 +647,13 @@ export function ImageViewerModal({
           </div>
         )}
 
-        {/* Controls Pill (Glassmorphic) */}
-        <div className="bg-zinc-950/65 dark:bg-zinc-950/70 backdrop-blur-2xl backdrop-saturate-150 px-3 sm:px-4 py-2 rounded-2xl sm:rounded-3xl border border-white/15 flex items-center gap-1.5 sm:gap-3 text-white text-xs shadow-[0_16px_50px_rgba(0,0,0,0.6)] ring-1 ring-white/10 max-w-[95vw] overflow-x-auto scrollbar-none">
+        {/* Controls Dock */}
+        <div className="bg-[#11141C]/90 backdrop-blur-2xl px-3 sm:px-4 py-2 rounded-2xl border border-white/15 flex items-center gap-1.5 sm:gap-2.5 text-white text-xs shadow-2xl max-w-[95vw] overflow-x-auto scrollbar-none">
           <button onClick={handleZoomOut} title="کوچک‌نمایی (-)" className="p-1.5 rounded-lg hover:bg-white/10 hover:text-rose-400 transition shrink-0 cursor-pointer">
             <ZoomOut className="w-4 h-4" />
           </button>
 
-          <span className="font-mono text-[11px] px-1 text-zinc-300 min-w-10 text-center font-bold shrink-0">
+          <span className="font-mono tabular-nums text-[11px] px-1 text-slate-200 min-w-10 text-center font-bold shrink-0">
             {Math.round(zoom * 100)}%
           </span>
 
@@ -657,7 +661,7 @@ export function ImageViewerModal({
             <ZoomIn className="w-4 h-4" />
           </button>
 
-          <div className="w-px h-4 bg-white/20 mx-0.5 shrink-0" />
+          <div className="w-px h-4 bg-white/15 mx-0.5 shrink-0" />
 
           <button onClick={handleRotateCcw} title="چرخش ۹۰- درجه" className="p-1.5 rounded-lg hover:bg-white/10 hover:text-rose-400 transition hidden sm:flex shrink-0 cursor-pointer">
             <RotateCcw className="w-4 h-4" />
@@ -675,14 +679,14 @@ export function ImageViewerModal({
             <FlipVertical className="w-4 h-4" />
           </button>
 
-          <div className="w-px h-4 bg-white/20 mx-0.5 shrink-0" />
+          <div className="w-px h-4 bg-white/15 mx-0.5 shrink-0" />
 
           {imageFiles.length > 1 && (
             <button
               onClick={() => setShowFilmstrip(!showFilmstrip)}
               title="نمایش نوار تصاویر"
               className={`p-1.5 rounded-lg transition shrink-0 cursor-pointer ${
-                showFilmstrip ? 'text-rose-400 bg-rose-500/20 border border-rose-500/30' : 'text-zinc-400 hover:bg-white/10 hover:text-white'
+                showFilmstrip ? 'text-rose-400 bg-rose-500/20 border border-rose-500/30' : 'text-slate-400 hover:bg-white/10 hover:text-white'
               }`}
             >
               <Layers className="w-4 h-4" />
@@ -692,7 +696,7 @@ export function ImageViewerModal({
           <button 
             onClick={handleReset} 
             title="ریست مقیاس و جهت (0)" 
-            className="text-[11px] font-medium px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-xl transition text-zinc-200 hover:text-white shrink-0 border border-white/10 cursor-pointer"
+            className="text-[11px] font-semibold px-2.5 py-1 bg-[#171B26] hover:bg-[#232938] rounded-xl transition text-slate-200 hover:text-white shrink-0 border border-white/10 cursor-pointer"
           >
             ریست
           </button>

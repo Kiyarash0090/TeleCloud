@@ -296,20 +296,25 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl max-h-[92vh] bg-white dark:bg-[#18191d] rounded-3xl shadow-2xl border border-slate-200/80 dark:border-zinc-800 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/60 dark:bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-xl max-h-[92vh] bg-white dark:bg-[#11141C] rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-slate-900/20 dark:shadow-black/70 border-t sm:border border-slate-200/80 dark:border-white/[0.08] flex flex-col overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
         
+        {/* Mobile Drag Handle */}
+        <div className="sm:hidden flex justify-center pt-2.5 pb-0.5">
+          <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-white/20" />
+        </div>
+
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 dark:border-zinc-800/80 shrink-0">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 dark:border-white/[0.06] shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-sky-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/25 shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-sky-400 flex items-center justify-center shrink-0">
               <Link2 className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 leading-tight">
                 {t('telegramLinkInspector')}
               </h3>
-              <p className="text-xs text-slate-500 dark:text-zinc-400 font-medium">
+              <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium">
                 {lang === 'fa' ? 'استخراج فایل از لینک مستقیم وب یا پست تلگرام و ارسال به فضای ابری' : 'Download file from direct web URL or Telegram link to cloud storage'}
               </p>
             </div>
@@ -317,23 +322,23 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
+            className="w-9 h-9 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06] flex items-center justify-center active:scale-95 transition-all cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Content Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5">
           
           {/* Link Input Section */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center justify-between">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
               <span>{lang === 'fa' ? 'ورود لینک مستقیم فایل یا پست تلگرام:' : 'Direct Download URL or Telegram Link:'}</span>
               <button
                 type="button"
                 onClick={handlePasteClipboard}
-                className="text-blue-600 dark:text-sky-400 hover:underline flex items-center gap-1 font-bold text-[11px] cursor-pointer"
+                className="text-blue-600 dark:text-sky-400 hover:underline flex items-center gap-1 font-semibold text-[11px] cursor-pointer"
               >
                 <Clipboard className="w-3.5 h-3.5" />
                 <span>{lang === 'fa' ? 'جای‌گذاری از حافظه' : 'Paste from clipboard'}</span>
@@ -348,7 +353,7 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
                 onChange={(e) => setLinkInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleInspectLink()}
                 placeholder={t('enterTelegramLink')}
-                className="w-full ps-3.5 pe-24 py-3 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 focus:border-blue-500 dark:focus:border-blue-400 focus:bg-white dark:focus:bg-zinc-800 rounded-2xl text-xs sm:text-sm font-mono text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all dir-ltr text-start"
+                className="w-full h-12 ps-3.5 pe-26 bg-slate-50 dark:bg-[#171B26] border border-slate-200/80 dark:border-white/[0.08] focus:border-blue-500 dark:focus:border-sky-400 focus:bg-white dark:focus:bg-[#1C212E] rounded-xl text-xs sm:text-sm font-mono text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none transition-all dir-ltr text-start"
               />
 
               <div className="absolute end-1.5 flex items-center gap-1">
@@ -360,7 +365,7 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
                       setError(null);
                       setRemoteTask(null);
                     }}
-                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-200/60 dark:hover:bg-zinc-700/60 transition cursor-pointer"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-white/[0.08] transition cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -370,7 +375,7 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
                   type="button"
                   onClick={() => handleInspectLink()}
                   disabled={isLoading || !linkInput.trim()}
-                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs shadow-md shadow-blue-500/20 disabled:opacity-50 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                  className="h-9 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-semibold text-xs shadow-xs disabled:opacity-50 transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
                 >
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -380,13 +385,11 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
                 </button>
               </div>
             </div>
-
-
           </div>
 
           {/* Error Banner */}
           {error && (
-            <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-center gap-2.5 animate-in fade-in duration-150">
+            <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/25 text-rose-700 dark:text-rose-300 text-xs font-medium flex items-center gap-2.5 animate-in fade-in duration-150">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
               <span>{error}</span>
             </div>
@@ -394,30 +397,30 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
 
           {/* Extracted Media Preview Box */}
           {extractedMedia && (
-            <div className="p-4 rounded-2xl bg-slate-50/90 dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800 space-y-4 animate-in fade-in zoom-in-98 duration-200">
+            <div className="p-4 rounded-2xl bg-slate-50/90 dark:bg-[#171B26] border border-slate-200/80 dark:border-white/[0.08] space-y-4 animate-in fade-in zoom-in-98 duration-200">
               
               {/* Media Title & Source Header */}
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700/80 shadow-2xs shrink-0">
+                  <div className="p-2.5 rounded-xl bg-white dark:bg-[#11141C] border border-slate-200/80 dark:border-white/[0.08] shadow-2xs shrink-0">
                     {getMediaIcon(extractedMedia.category)}
                   </div>
                   <div className="min-w-0">
-                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
                       {extractedMedia.filename}
                     </h4>
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-zinc-400 font-mono mt-0.5">
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-mono tabular-nums mt-0.5">
                       <span dir="ltr" className="font-mono dir-ltr inline-block">{formatFileSize(extractedMedia.size)}</span>
                       {extractedMedia.duration && (
                         <>
-                          <span>•</span>
+                          <span>·</span>
                           <span>{formatDuration(extractedMedia.duration)}</span>
                         </>
                       )}
                       {extractedMedia.chatTitle && (
                         <>
-                          <span>•</span>
-                          <span className="text-blue-600 dark:text-sky-400 truncate max-w-[120px]">
+                          <span>·</span>
+                          <span className="text-blue-600 dark:text-sky-400 truncate max-w-[120px] font-sans">
                             {extractedMedia.chatTitle}
                           </span>
                         </>
@@ -426,7 +429,7 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
                   </div>
                 </div>
 
-                <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-sky-400 text-[10px] font-mono font-bold uppercase shrink-0">
+                <span className="text-[10px] font-mono font-semibold uppercase text-blue-600 dark:text-sky-400 shrink-0">
                   {extractedMedia.isDirectUrl ? (lang === 'fa' ? 'لینک مستقیم' : 'Direct Link') : extractedMedia.category}
                 </span>
               </div>
@@ -435,7 +438,7 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
               {extractedMedia.category === 'images' ? (
                 <div
                   onClick={handlePlayOrView}
-                  className="relative group rounded-2xl overflow-hidden bg-slate-900 aspect-video max-h-64 flex items-center justify-center cursor-pointer border border-slate-200/60 dark:border-zinc-800 shadow-md"
+                  className="relative group rounded-xl overflow-hidden bg-slate-950 aspect-video max-h-64 flex items-center justify-center cursor-pointer border border-slate-200/60 dark:border-white/[0.08]"
                 >
                   <img
                     src={extractedMedia.directUrl}
@@ -443,14 +446,14 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                    <span className="px-3 py-1.5 rounded-xl bg-white/90 dark:bg-zinc-900/90 text-slate-900 dark:text-white font-bold text-xs shadow-lg backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute inset-0 bg-black/30 group-hover:bg-black/15 transition-colors flex items-center justify-center">
+                    <span className="px-3 py-1.5 rounded-xl bg-white/90 dark:bg-[#11141C]/90 text-slate-900 dark:text-slate-100 font-semibold text-xs shadow-lg backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity">
                       {lang === 'fa' ? 'مشاهده کامل تصویر' : 'View Full Image'}
                     </span>
                   </div>
                 </div>
               ) : extractedMedia.category === 'videos' ? (
-                <div className="relative rounded-2xl overflow-hidden bg-black aspect-video max-h-64 flex items-center justify-center border border-slate-200/60 dark:border-zinc-800 shadow-md">
+                <div className="relative rounded-xl overflow-hidden bg-black aspect-video max-h-64 flex items-center justify-center border border-slate-200/60 dark:border-white/[0.08]">
                   <video
                     src={extractedMedia.directUrl}
                     controls
@@ -459,41 +462,41 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
                   />
                 </div>
               ) : extractedMedia.category === 'audio' ? (
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-sky-500/10 border border-emerald-500/20 flex items-center justify-between gap-3">
+                <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0">
-                      <Music className="w-6 h-6" />
+                    <div className="w-11 h-11 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                      <Music className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                      <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
                         {extractedMedia.filename}
                       </div>
-                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-                        {formatDuration(extractedMedia.duration || 0)} • {formatFileSize(extractedMedia.size)}
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono tabular-nums mt-0.5">
+                        {formatDuration(extractedMedia.duration || 0)} · {formatFileSize(extractedMedia.size)}
                       </div>
                     </div>
                   </div>
 
                   <button
                     onClick={handlePlayOrView}
-                    className="p-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-md active:scale-90 transition cursor-pointer shrink-0"
+                    className="w-10 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center justify-center active:scale-90 transition cursor-pointer shrink-0"
                     title={t('play')}
                   >
-                    <Play className="w-5 h-5 fill-current" />
+                    <Play className="w-4.5 h-4.5 fill-current" />
                   </button>
                 </div>
               ) : null}
 
               {/* Caption Section */}
               {extractedMedia.caption && (
-                <div className="p-3 rounded-xl bg-white dark:bg-zinc-800/80 border border-slate-200/70 dark:border-zinc-700/60 relative">
+                <div className="p-3 rounded-xl bg-white dark:bg-[#11141C] border border-slate-200/70 dark:border-white/[0.07] relative">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase">
+                    <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase">
                       {lang === 'fa' ? 'توضیحات پست (Caption)' : 'Caption'}
                     </span>
                     <button
                       onClick={() => handleCopyText(extractedMedia.caption, 'caption')}
-                      className="text-[11px] text-blue-600 dark:text-sky-400 hover:underline flex items-center gap-1 font-bold cursor-pointer"
+                      className="text-[11px] text-blue-600 dark:text-sky-400 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
                     >
                       {copiedType === 'caption' ? (
                         <>
@@ -508,7 +511,7 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
                       )}
                     </button>
                   </div>
-                  <p className="text-xs text-slate-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto font-sans">
+                  <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto font-sans">
                     {extractedMedia.caption}
                   </p>
                 </div>
@@ -516,13 +519,13 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
 
               {/* REAL-TIME PROGRESS & SPEED TRACKER CARD */}
               {isSavingToSaved && remoteTask && (
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-900/90 via-sky-900/90 to-indigo-900/90 text-white border border-blue-400/40 shadow-xl space-y-3 animate-in fade-in zoom-in-98 duration-150">
+                <div className="p-4 rounded-xl bg-[#0F172A] dark:bg-[#11141C] text-white border border-blue-500/30 shadow-lg space-y-3 animate-in fade-in zoom-in-98 duration-150">
                   
                   {/* Phase & Live Speed Header */}
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Activity className="w-4 h-4 text-sky-300 animate-pulse shrink-0" />
-                      <span className="text-xs font-bold text-sky-100">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Activity className="w-4 h-4 text-sky-400 shrink-0" />
+                      <span className="text-xs font-semibold text-slate-100 truncate">
                         {remoteTask.phase === 'downloading'
                           ? (lang === 'fa' ? 'فاز ۱ از ۲: دریافت فایل از سرور مقصد...' : 'Phase 1/2: Downloading from source...')
                           : (lang === 'fa' ? `فاز ۲ از ۲: ارسال سریع به «${targetDisplayTitle}»...` : `Phase 2/2: Streaming to "${targetDisplayTitle}"...`)}
@@ -530,40 +533,37 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/25 border border-sky-400/30 text-amber-300 font-mono text-[11px] font-bold">
-                        <Zap className="w-3 h-3 text-amber-300 fill-amber-300 animate-bounce" />
+                      <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/15 border border-amber-400/30 text-amber-300 font-mono tabular-nums text-[11px] font-semibold">
+                        <Zap className="w-3 h-3 text-amber-300 fill-amber-300" />
                         <span>{remoteTask.speed}</span>
                       </div>
 
                       <button
                         type="button"
                         onClick={handleCancelRemoteTransfer}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-500/20 hover:bg-rose-500/40 border border-rose-400/40 text-rose-200 font-bold text-[11px] active:scale-95 transition cursor-pointer"
+                        className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/35 border border-rose-400/30 text-rose-200 font-semibold text-[11px] active:scale-95 transition cursor-pointer"
                         title={lang === 'fa' ? 'لغو انتقال آنلاین' : 'Cancel transfer'}
                       >
                         <XCircle className="w-3.5 h-3.5 text-rose-300" />
                         <span>{lang === 'fa' ? 'لغو' : 'Cancel'}</span>
                       </button>
                     </div>
-
                   </div>
 
                   {/* Progress Bar Container */}
                   <div className="space-y-1.5">
-                    <div className="w-full h-3.5 bg-black/40 rounded-full overflow-hidden p-0.5 border border-white/10 relative">
+                    <div className="w-full h-2.5 bg-white/10 rounded-full overflow-hidden">
                       <div
                         style={{ width: `${Math.max(3, remoteTask.progress)}%` }}
-                        className="h-full bg-gradient-to-r from-blue-400 via-sky-300 to-emerald-400 rounded-full transition-all duration-300 shadow-md relative overflow-hidden"
-                      >
-                        <div className="absolute inset-0 bg-white/20 animate-pulse" />
-                      </div>
+                        className="h-full bg-gradient-to-r from-blue-500 via-sky-400 to-emerald-400 rounded-full transition-all duration-300"
+                      />
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px] font-mono text-sky-200">
+                    <div className="flex items-center justify-between text-[11px] font-mono tabular-nums text-slate-300">
                       <span dir="ltr" className="font-mono dir-ltr inline-block">
                         {formatFileSize(remoteTask.loadedSize)} / {formatFileSize(remoteTask.totalSize || remoteTask.loadedSize)}
                       </span>
-                      <span className="font-extrabold text-white text-xs">{remoteTask.progress}%</span>
+                      <span className="font-bold text-white text-xs">{remoteTask.progress}%</span>
                     </div>
                   </div>
                 </div>
@@ -574,11 +574,11 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
                 <div className="pt-1">
                   <button
                     onClick={handleSaveToSavedMessages}
-                    className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-blue-600 via-sky-500 to-indigo-600 hover:from-blue-500 hover:to-sky-400 active:scale-98 text-white font-black text-xs sm:text-sm shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
+                    className="w-full min-h-[44px] py-3 px-5 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white font-semibold text-xs sm:text-sm shadow-sm shadow-blue-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
                   >
                     {saveSuccess ? (
                       <>
-                        <Check className="w-5 h-5 text-emerald-300 stroke-[3]" />
+                        <Check className="w-4.5 h-4.5 text-emerald-300 stroke-[3]" />
                         <span className="text-emerald-100">
                           {lang === 'fa'
                             ? `فایل با موفقیت در «${targetDisplayTitle}» ذخیره شد!`
@@ -587,7 +587,7 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
                       </>
                     ) : (
                       <>
-                        <Send className="w-5 h-5 stroke-[2.2]" />
+                        <Send className="w-4.5 h-4.5 stroke-[2.2]" />
                         <span>
                           {lang === 'fa'
                             ? `ارسال مستقیم محتوا به «${targetDisplayTitle}»`
@@ -601,20 +601,17 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
 
               {/* Action Toolbar Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
-                
-                {/* 1. Direct Download Button */}
                 <button
                   onClick={handleDownloadFile}
-                  className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 active:scale-98 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-200 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  className="w-full min-h-[40px] py-2 px-3 rounded-xl bg-white dark:bg-[#11141C] hover:bg-slate-100 dark:hover:bg-[#1C212E] active:scale-[0.98] border border-slate-200/80 dark:border-white/[0.08] text-slate-800 dark:text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                 >
-                  <Download className="w-4 h-4 text-blue-500" />
+                  <Download className="w-4 h-4 text-blue-600 dark:text-sky-400" />
                   <span>{t('downloadMedia')}</span>
                 </button>
 
-                {/* 2. Copy Direct Streaming Link */}
                 <button
                   onClick={() => handleCopyText(extractedMedia.downloadUrl || extractedMedia.directUrl, 'download')}
-                  className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 active:scale-98 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-200 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  className="w-full min-h-[40px] py-2 px-3 rounded-xl bg-white dark:bg-[#11141C] hover:bg-slate-100 dark:hover:bg-[#1C212E] active:scale-[0.98] border border-slate-200/80 dark:border-white/[0.08] text-slate-800 dark:text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                 >
                   {copiedType === 'download' ? (
                     <>
@@ -623,16 +620,15 @@ export function TelegramLinkModal({ onClose, initialLink = '' }: TelegramLinkMod
                     </>
                   ) : (
                     <>
-                      <Copy className="w-4 h-4 text-blue-500" />
+                      <Copy className="w-4 h-4 text-blue-600 dark:text-sky-400" />
                       <span>{t('copyTelegramLink')}</span>
                     </>
                   )}
                 </button>
 
-                {/* 3. Play or Fullscreen Preview */}
                 <button
                   onClick={handlePlayOrView}
-                  className="w-full py-2.5 px-3 rounded-xl bg-slate-100 dark:bg-zinc-800/90 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-800 dark:text-zinc-200 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  className="w-full min-h-[40px] py-2 px-3 rounded-xl bg-slate-100 dark:bg-[#232938] hover:bg-slate-200 dark:hover:bg-[#2C3444] text-slate-800 dark:text-slate-100 font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer whitespace-nowrap"
                 >
                   <Play className="w-4 h-4 text-amber-500 fill-amber-500" />
                   <span>{lang === 'fa' ? 'پخش آنلاین' : 'Play / View'}</span>

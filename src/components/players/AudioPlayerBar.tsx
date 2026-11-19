@@ -577,11 +577,11 @@ export function AudioPlayerBar() {
         onEnded={handleEnded}
       />
 
-      {/* Playlist Queue Dropup Panel (Glassmorphic) */}
+      {/* Playlist Queue Dropup Panel */}
       {showPlaylist && (
-        <div className="mb-2.5 bg-white/85 dark:bg-[#121316]/85 backdrop-blur-2xl backdrop-saturate-150 rounded-2xl sm:rounded-3xl shadow-[0_12px_40px_rgba(0,0,0,0.2)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.6)] border border-white/60 dark:border-white/15 p-3 max-h-60 sm:max-h-72 overflow-y-auto flex flex-col gap-1 text-xs animate-in fade-in slide-in-from-bottom-2 duration-200 ring-1 ring-black/5 dark:ring-white/5">
-          <div className="flex items-center justify-between px-2 pb-2 border-b border-slate-200/60 dark:border-white/10 text-slate-700 dark:text-zinc-200 font-bold">
-            <span className="flex items-center gap-2">
+        <div className="mb-2.5 bg-white/95 dark:bg-[#11141C]/95 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/80 dark:border-white/[0.08] p-3 max-h-60 sm:max-h-72 overflow-y-auto flex flex-col gap-1 text-xs animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="flex items-center justify-between px-2 pb-2 border-b border-slate-200/70 dark:border-white/[0.07] text-slate-800 dark:text-slate-100 font-bold">
+            <span className="flex items-center gap-2 tabular-nums">
               <ListMusic className="w-4 h-4 text-emerald-500" />
               <span>
                 {lang === 'fa'
@@ -591,7 +591,7 @@ export function AudioPlayerBar() {
             </span>
             <button
               onClick={() => setShowPlaylist(false)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/10 transition"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#171B26] transition cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -613,26 +613,26 @@ export function AudioPlayerBar() {
                     setActiveAudio(file);
                     setShowPlaylist(false);
                   }}
-                  className={`flex items-center justify-between gap-3 p-2 rounded-xl text-start transition ${
+                  className={`flex items-center justify-between gap-3 p-2.5 rounded-xl text-start transition cursor-pointer ${
                     isCurrent
-                      ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30'
-                      : 'hover:bg-white/50 dark:hover:bg-white/[0.07] text-slate-700 dark:text-zinc-300'
+                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/25'
+                      : 'hover:bg-slate-100/80 dark:hover:bg-[#171B26] text-slate-700 dark:text-slate-300'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <span className="w-5 text-center text-[11px] text-slate-400 dark:text-zinc-500 font-mono shrink-0">
+                    <span className="w-5 text-center text-[11px] text-slate-400 dark:text-slate-500 font-mono tabular-nums shrink-0">
                       {idx + 1}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold" dir="auto">
                         {cleanItemName}
                       </p>
-                      <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-mono mt-0.5">
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono tabular-nums mt-0.5" dir="ltr">
                         {formatFileSize(file.size)}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400 dark:text-zinc-400 shrink-0">
+                  <div className="flex items-center gap-2 font-mono tabular-nums text-[11px] text-slate-500 dark:text-slate-400 shrink-0" dir="ltr">
                     {Boolean(file.duration && file.duration > 0) && (
                       <span>{formatDuration(file.duration!)}</span>
                     )}
@@ -651,14 +651,14 @@ export function AudioPlayerBar() {
         </div>
       )}
 
-      {/* Mobile Expanded Deck (Glassmorphic) */}
+      {/* Mobile Expanded Deck */}
       {isMobileExpanded && (
-        <div className="md:hidden mb-2 bg-white/80 dark:bg-[#121316]/80 backdrop-blur-2xl backdrop-saturate-150 rounded-3xl shadow-[0_12px_40px_rgba(0,0,0,0.25)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.65)] border border-white/60 dark:border-white/15 p-4 flex flex-col gap-3.5 animate-in fade-in slide-in-from-bottom-3 duration-200 ring-1 ring-black/5 dark:ring-white/5">
+        <div className="md:hidden mb-2 bg-white/95 dark:bg-[#11141C]/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-slate-200/80 dark:border-white/[0.08] p-4 flex flex-col gap-3.5 animate-in fade-in slide-in-from-bottom-3 duration-200">
           {/* Top Handle & Quick Actions */}
           <div className="flex items-center justify-between gap-2">
             <button
               onClick={() => setIsMobileExpanded(false)}
-              className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-zinc-400 active:scale-95"
+              className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 active:scale-95 cursor-pointer"
             >
               <ChevronDown className="w-4 h-4" />
               <span>{lang === 'fa' ? 'جمع کردن پلیر' : 'Minimize'}</span>
@@ -669,10 +669,10 @@ export function AudioPlayerBar() {
                 <button
                   key={s}
                   onClick={() => changeSpeed(s)}
-                  className={`px-2 py-1 rounded-lg text-[10px] font-mono font-bold transition ${
+                  className={`px-2 py-1 rounded-lg text-[10px] font-mono tabular-nums font-bold transition cursor-pointer ${
                     playbackRate === s
                       ? 'bg-emerald-500 text-white shadow-xs'
-                      : 'bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400'
+                      : 'bg-slate-100 dark:bg-[#171B26] text-slate-600 dark:text-slate-400'
                   }`}
                 >
                   {s}x
@@ -691,9 +691,9 @@ export function AudioPlayerBar() {
               onTouchEnd={handleScrubTouchEnd}
               className="relative w-full h-6 flex items-center cursor-pointer touch-none"
             >
-              <div className="w-full h-2 bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden relative">
+              <div className="w-full h-2 bg-slate-200 dark:bg-[#171B26] rounded-full overflow-hidden relative">
                 <div
-                  className="absolute inset-y-0 left-0 bg-slate-300 dark:bg-zinc-700 rounded-full transition-all duration-150"
+                  className="absolute inset-y-0 left-0 bg-slate-300 dark:bg-[#232938] rounded-full transition-all duration-150"
                   style={{ width: `${bufferedPercent}%` }}
                 />
                 <div
@@ -707,11 +707,11 @@ export function AudioPlayerBar() {
               />
             </div>
 
-            <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 dark:text-zinc-500 px-0.5">
+            <div className="flex items-center justify-between text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400 px-0.5">
               <span>{formatDuration(currentTime)}</span>
               <button
                 onClick={() => setShowRemainingTime((prev) => !prev)}
-                className="hover:text-slate-700 dark:hover:text-zinc-300"
+                className="hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
               >
                 {showRemainingTime && effectiveDuration > 0
                   ? `-${formatDuration(Math.max(0, effectiveDuration - currentTime))}`
@@ -724,10 +724,10 @@ export function AudioPlayerBar() {
           <div className="flex items-center justify-between px-2" dir="ltr">
             <button
               onClick={() => setIsShuffle(!isShuffle)}
-              className={`p-2.5 rounded-xl transition active:scale-90 ${
+              className={`p-2.5 rounded-xl transition active:scale-90 cursor-pointer ${
                 isShuffle
                   ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
-                  : 'text-slate-400 dark:text-zinc-500'
+                  : 'text-slate-400 dark:text-slate-500'
               }`}
               title="Shuffle"
             >
@@ -737,14 +737,14 @@ export function AudioPlayerBar() {
             <button
               onClick={handlePrevTrack}
               disabled={audioFiles.length <= 1 && currentTime <= 3}
-              className="p-2.5 rounded-xl text-slate-700 dark:text-zinc-200 active:scale-90 transition disabled:opacity-30"
+              className="p-2.5 rounded-xl text-slate-700 dark:text-slate-200 active:scale-90 transition disabled:opacity-30 cursor-pointer"
             >
               <SkipBack className="w-5 h-5 fill-current" />
             </button>
 
             <button
               onClick={() => skipTime(-10)}
-              className="p-2.5 rounded-xl text-slate-500 dark:text-zinc-400 active:scale-90 transition"
+              className="p-2.5 rounded-xl text-slate-500 dark:text-slate-400 active:scale-90 transition cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
             </button>
@@ -752,7 +752,7 @@ export function AudioPlayerBar() {
             <button
               onClick={togglePlay}
               disabled={hasError}
-              className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/30 flex items-center justify-center active:scale-95 transition"
+              className="w-12 h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/25 flex items-center justify-center active:scale-95 transition cursor-pointer"
             >
               {isPlayingAudio ? (
                 <Pause className="w-5 h-5 fill-current" />
@@ -763,7 +763,7 @@ export function AudioPlayerBar() {
 
             <button
               onClick={() => skipTime(10)}
-              className="p-2.5 rounded-xl text-slate-500 dark:text-zinc-400 active:scale-90 transition"
+              className="p-2.5 rounded-xl text-slate-500 dark:text-slate-400 active:scale-90 transition cursor-pointer"
             >
               <RotateCw className="w-4 h-4" />
             </button>
@@ -771,17 +771,17 @@ export function AudioPlayerBar() {
             <button
               onClick={handleNextTrack}
               disabled={audioFiles.length <= 1}
-              className="p-2.5 rounded-xl text-slate-700 dark:text-zinc-200 active:scale-90 transition disabled:opacity-30"
+              className="p-2.5 rounded-xl text-slate-700 dark:text-slate-200 active:scale-90 transition disabled:opacity-30 cursor-pointer"
             >
               <SkipForward className="w-5 h-5 fill-current" />
             </button>
 
             <button
               onClick={cycleRepeatMode}
-              className={`p-2.5 rounded-xl transition active:scale-90 ${
+              className={`p-2.5 rounded-xl transition active:scale-90 cursor-pointer ${
                 repeatMode !== 'off'
                   ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
-                  : 'text-slate-400 dark:text-zinc-500'
+                  : 'text-slate-400 dark:text-slate-500'
               }`}
             >
               {repeatMode === 'one' ? (
@@ -793,13 +793,13 @@ export function AudioPlayerBar() {
           </div>
 
           {/* Bottom Utility Actions Row */}
-          <div className="grid grid-cols-4 gap-2 pt-2 border-t border-slate-100 dark:border-zinc-800/80 text-[11px] font-semibold">
+          <div className="grid grid-cols-4 gap-2 pt-2.5 border-t border-slate-200/70 dark:border-white/[0.07] text-[11px] font-semibold">
             <button
               onClick={() => setShowPlaylist((prev) => !prev)}
-              className={`flex items-center justify-center gap-1.5 py-2 rounded-xl transition active:scale-95 ${
+              className={`flex items-center justify-center gap-1.5 min-h-[38px] rounded-xl transition active:scale-95 tabular-nums cursor-pointer ${
                 showPlaylist
                   ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                  : 'bg-slate-100 dark:bg-zinc-800/80 text-slate-600 dark:text-zinc-300'
+                  : 'bg-slate-100 dark:bg-[#171B26] text-slate-600 dark:text-slate-300'
               }`}
             >
               <ListMusic className="w-3.5 h-3.5" />
@@ -808,7 +808,7 @@ export function AudioPlayerBar() {
 
             <button
               onClick={handleCopyLink}
-              className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800/80 text-slate-600 dark:text-zinc-300 active:scale-95 transition"
+              className="flex items-center justify-center gap-1.5 min-h-[38px] rounded-xl bg-slate-100 dark:bg-[#171B26] text-slate-600 dark:text-slate-300 active:scale-95 transition cursor-pointer"
             >
               {isCopied ? (
                 <Check className="w-3.5 h-3.5 text-emerald-500" />
@@ -820,7 +820,7 @@ export function AudioPlayerBar() {
 
             <button
               onClick={() => setShareModalFile(activeAudio)}
-              className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-slate-100 dark:bg-zinc-800/80 text-slate-600 dark:text-zinc-300 active:scale-95 transition"
+              className="flex items-center justify-center gap-1.5 min-h-[38px] rounded-xl bg-slate-100 dark:bg-[#171B26] text-slate-600 dark:text-slate-300 active:scale-95 transition cursor-pointer"
             >
               <Share2 className="w-3.5 h-3.5" />
               <span>{lang === 'fa' ? 'اشتراک' : 'Share'}</span>
@@ -829,7 +829,7 @@ export function AudioPlayerBar() {
             <a
               href={activeAudio.downloadUrl}
               download={displayFilename}
-              className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 active:scale-95 transition"
+              className="flex items-center justify-center gap-1.5 min-h-[38px] rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 active:scale-95 transition"
             >
               <Download className="w-3.5 h-3.5" />
               <span>{lang === 'fa' ? 'دانلود' : 'Save'}</span>
@@ -838,8 +838,8 @@ export function AudioPlayerBar() {
         </div>
       )}
 
-      {/* Main Floating Dock Bar (Glassmorphic) */}
-      <div className="bg-white/85 dark:bg-[#141519]/90 backdrop-blur-2xl backdrop-saturate-150 rounded-2xl sm:rounded-3xl shadow-[0_14px_38px_rgba(0,0,0,0.2)] dark:shadow-[0_16px_44px_rgba(0,0,0,0.7)] border border-white/70 dark:border-white/15 ring-1 ring-black/5 dark:ring-white/5 overflow-visible relative transition-all">
+      {/* Main Floating Dock Bar */}
+      <div className="bg-white/95 dark:bg-[#11141C]/95 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-[0_14px_38px_rgba(15,23,42,0.18)] dark:shadow-[0_16px_44px_rgba(0,0,0,0.7)] border border-slate-200/80 dark:border-white/[0.08] overflow-visible relative transition-all">
         {/* Top Interactive Scrub Bar */}
         <div
           dir="ltr"
@@ -852,9 +852,9 @@ export function AudioPlayerBar() {
           onTouchEnd={handleScrubTouchEnd}
           className="relative w-full h-3.5 flex items-center cursor-pointer group/bar px-3.5 sm:px-5 pt-1 touch-none"
         >
-          <div className="w-full h-1 group-hover/bar:h-1.5 bg-slate-200/80 dark:bg-zinc-800/80 rounded-full overflow-hidden transition-all relative">
+          <div className="w-full h-1 group-hover/bar:h-1.5 bg-slate-200/90 dark:bg-[#171B26] rounded-full overflow-hidden transition-all relative">
             <div
-              className="absolute inset-y-0 left-0 bg-slate-300/80 dark:bg-zinc-700/80 rounded-full transition-all duration-150"
+              className="absolute inset-y-0 left-0 bg-slate-300 dark:bg-[#232938] rounded-full transition-all duration-150"
               style={{ width: `${bufferedPercent}%` }}
             />
             <div
@@ -870,7 +870,7 @@ export function AudioPlayerBar() {
 
           {hoverTime !== null && (
             <div
-              className="hidden sm:block absolute -top-7 -translate-x-1/2 px-2 py-0.5 rounded-md bg-slate-900 dark:bg-zinc-900 text-white font-mono text-[10px] pointer-events-none shadow-lg border border-white/10"
+              className="hidden sm:block absolute -top-7 -translate-x-1/2 px-2 py-0.5 rounded-md bg-[#0F172A] dark:bg-[#171B26] text-white font-mono tabular-nums text-[10px] pointer-events-none shadow-lg border border-white/10"
               style={{ left: `${hoverPosition}px` }}
             >
               {formatDuration(hoverTime)}
@@ -896,11 +896,12 @@ export function AudioPlayerBar() {
             className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 cursor-pointer md:cursor-default transition-transform duration-150"
           >
             {/* Album Cover or Rotating Studio Icon */}
-            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-emerald-500/15 via-teal-500/15 to-cyan-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/25 relative overflow-hidden">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/20 relative overflow-hidden">
               {activeAudio.thumbnailUrl ? (
                 <img
                   src={activeAudio.thumbnailUrl}
                   alt={displayFilename}
+                  referrerPolicy="no-referrer"
                   className="w-full h-full object-cover"
                 />
               ) : isPlayingAudio && !hasError ? (
@@ -922,21 +923,21 @@ export function AudioPlayerBar() {
             {/* Track Title & Unboxed Metadata */}
             <div className="min-w-0 flex-1">
               <h4
-                className="text-xs sm:text-sm font-bold text-slate-900 dark:text-zinc-100 truncate"
+                className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate"
                 dir="auto"
                 title={displayFilename}
               >
                 {displayFilename}
               </h4>
 
-              <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-500 dark:text-zinc-400 font-mono truncate mt-0.5" dir="ltr">
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 font-mono tabular-nums truncate mt-0.5" dir="ltr">
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowRemainingTime((prev) => !prev);
                   }}
-                  className="hover:text-emerald-600 dark:hover:text-emerald-400 transition"
+                  className="hover:text-emerald-600 dark:hover:text-emerald-400 transition cursor-pointer"
                 >
                   {formatDuration(currentTime)}
                   {effectiveDuration > 0
@@ -966,10 +967,10 @@ export function AudioPlayerBar() {
             {/* Shuffle (Desktop) */}
             <button
               onClick={() => setIsShuffle(!isShuffle)}
-              className={`p-2 rounded-xl transition hidden md:flex ${
+              className={`p-2 rounded-xl transition hidden md:flex cursor-pointer ${
                 isShuffle
                   ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
-                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200'
+                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
               title="Shuffle"
             >
@@ -980,7 +981,7 @@ export function AudioPlayerBar() {
             <button
               onClick={handlePrevTrack}
               disabled={audioFiles.length <= 1 && currentTime <= 3}
-              className="flex p-1.5 sm:p-2 rounded-xl text-slate-600 hover:text-slate-900 dark:text-zinc-300 dark:hover:text-white transition disabled:opacity-30 active:scale-90 cursor-pointer"
+              className="flex p-1.5 sm:p-2 rounded-xl text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition disabled:opacity-30 active:scale-90 cursor-pointer"
               title={lang === 'fa' ? 'قبلی' : 'Previous'}
             >
               <SkipBack className="w-4 h-4 fill-current" />
@@ -989,7 +990,7 @@ export function AudioPlayerBar() {
             {/* -10s (Hidden on compact mobile bar, available in expanded view & desktop) */}
             <button
               onClick={() => skipTime(-10)}
-              className="hidden sm:flex p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-zinc-300 dark:hover:text-white transition active:scale-90 cursor-pointer"
+              className="hidden sm:flex p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-300 dark:hover:text-white transition active:scale-90 cursor-pointer"
               title="-10s"
             >
               <RotateCcw className="w-4 h-4" />
@@ -1000,7 +1001,7 @@ export function AudioPlayerBar() {
               onClick={togglePlay}
               disabled={hasError}
               aria-label={isPlayingAudio ? 'Pause' : 'Play'}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-md shadow-emerald-500/25 flex items-center justify-center active:scale-90 transition hover:brightness-105 disabled:opacity-50 shrink-0 cursor-pointer mx-0.5"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm shadow-emerald-600/25 flex items-center justify-center active:scale-90 transition disabled:opacity-50 shrink-0 cursor-pointer mx-0.5"
             >
               {isPlayingAudio ? (
                 <Pause className="w-4 h-4 fill-current" />
@@ -1012,7 +1013,7 @@ export function AudioPlayerBar() {
             {/* +10s (Hidden on compact mobile bar, available in expanded view & desktop) */}
             <button
               onClick={() => skipTime(10)}
-              className="hidden sm:flex p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-zinc-300 dark:hover:text-white transition active:scale-90 cursor-pointer"
+              className="hidden sm:flex p-1.5 sm:p-2 rounded-xl text-slate-500 hover:text-slate-800 dark:text-slate-300 dark:hover:text-white transition active:scale-90 cursor-pointer"
               title="+10s"
             >
               <RotateCw className="w-4 h-4" />
@@ -1022,7 +1023,7 @@ export function AudioPlayerBar() {
             <button
               onClick={handleNextTrack}
               disabled={audioFiles.length <= 1}
-              className="flex p-1.5 sm:p-2 rounded-xl text-slate-600 hover:text-slate-900 dark:text-zinc-300 dark:hover:text-white transition disabled:opacity-30 active:scale-90 cursor-pointer"
+              className="flex p-1.5 sm:p-2 rounded-xl text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition disabled:opacity-30 active:scale-90 cursor-pointer"
               title={lang === 'fa' ? 'بعدی' : 'Next'}
             >
               <SkipForward className="w-4 h-4 fill-current" />
@@ -1031,10 +1032,10 @@ export function AudioPlayerBar() {
             {/* Repeat Mode (Desktop) */}
             <button
               onClick={cycleRepeatMode}
-              className={`p-2 rounded-xl transition hidden md:flex ${
+              className={`p-2 rounded-xl transition hidden md:flex cursor-pointer ${
                 repeatMode !== 'off'
                   ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
-                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200'
+                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
               title="Repeat"
             >
@@ -1052,22 +1053,22 @@ export function AudioPlayerBar() {
             <div className="relative hidden md:block">
               <button
                 onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-                className="px-2 py-1.5 rounded-xl text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/10 text-xs font-mono font-bold transition border border-transparent hover:border-white/20"
+                className="px-2 py-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#171B26] text-xs font-mono tabular-nums font-bold transition cursor-pointer"
                 title={lang === 'fa' ? 'سرعت پخش' : 'Playback Speed'}
               >
                 {playbackRate}x
               </button>
 
               {showSpeedMenu && (
-                <div className="absolute bottom-full end-0 mb-2 w-24 rounded-2xl bg-white/80 dark:bg-zinc-900/80 backdrop-blur-2xl shadow-2xl border border-white/60 dark:border-white/15 p-1.5 z-50 text-xs flex flex-col gap-0.5 ring-1 ring-black/5 dark:ring-white/5">
+                <div className="absolute bottom-full end-0 mb-2 w-24 rounded-2xl bg-white/95 dark:bg-[#11141C]/95 backdrop-blur-2xl shadow-2xl border border-slate-200/80 dark:border-white/[0.08] p-1.5 z-50 text-xs flex flex-col gap-0.5">
                   {[0.75, 1, 1.25, 1.5, 2].map((s) => (
                     <button
                       key={s}
                       onClick={() => changeSpeed(s)}
-                      className={`px-2.5 py-1.5 rounded-xl text-center font-mono transition ${
+                      className={`px-2.5 py-1.5 rounded-xl text-center font-mono tabular-nums transition cursor-pointer ${
                         playbackRate === s
-                          ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/30'
-                          : 'hover:bg-white/60 dark:hover:bg-white/10 text-slate-700 dark:text-zinc-300'
+                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-500/25'
+                          : 'hover:bg-slate-100 dark:hover:bg-[#171B26] text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       {s}x
@@ -1081,7 +1082,7 @@ export function AudioPlayerBar() {
             <div className="hidden lg:flex items-center gap-1.5 group/vol px-1">
               <button
                 onClick={toggleMute}
-                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition"
+                className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition cursor-pointer"
               >
                 {isMuted || volume === 0 ? (
                   <VolumeX className="w-4 h-4 text-rose-500" />
@@ -1098,7 +1099,7 @@ export function AudioPlayerBar() {
                 step={0.05}
                 value={isMuted ? 0 : volume}
                 onChange={handleVolumeChange}
-                className="w-16 h-1 bg-slate-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                className="w-16 h-1 bg-slate-200 dark:bg-[#232938] rounded-lg appearance-none cursor-pointer accent-emerald-500"
               />
             </div>
 
@@ -1106,10 +1107,10 @@ export function AudioPlayerBar() {
             {audioFiles.length > 1 && (
               <button
                 onClick={() => setShowPlaylist(!showPlaylist)}
-                className={`hidden sm:flex p-2 rounded-xl transition ${
+                className={`hidden sm:flex p-2 rounded-xl transition cursor-pointer ${
                   showPlaylist
                     ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800'
+                    : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#171B26]'
                 }`}
                 title={lang === 'fa' ? 'لیست پخش' : 'Playlist'}
               >
@@ -1121,7 +1122,7 @@ export function AudioPlayerBar() {
             <button
               onClick={handleCopyLink}
               title={t('copyDirectLink')}
-              className="hidden sm:flex p-2 rounded-xl text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
+              className="hidden sm:flex p-2 rounded-xl text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-[#171B26] transition cursor-pointer"
             >
               {isCopied ? (
                 <Check className="w-4 h-4 text-emerald-500" />
@@ -1135,7 +1136,7 @@ export function AudioPlayerBar() {
               href={activeAudio.downloadUrl}
               download={activeAudio.filename}
               title={t('directDownload')}
-              className="hidden sm:flex p-2 rounded-xl text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
+              className="hidden sm:flex p-2 rounded-xl text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-100 dark:hover:bg-[#171B26] transition"
             >
               <Download className="w-4 h-4" />
             </a>
@@ -1144,10 +1145,10 @@ export function AudioPlayerBar() {
             <button
               onClick={() => setIsMobileExpanded((prev) => !prev)}
               aria-label="Toggle expanded player"
-              className={`md:hidden p-2 rounded-xl transition active:scale-90 ${
+              className={`md:hidden p-2 rounded-xl transition active:scale-90 cursor-pointer ${
                 isMobileExpanded
                   ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                  : 'text-slate-400 hover:text-slate-700 dark:text-zinc-400'
+                  : 'text-slate-400 hover:text-slate-700 dark:text-slate-400'
               }`}
             >
               {isMobileExpanded ? (
@@ -1161,7 +1162,7 @@ export function AudioPlayerBar() {
             <button
               onClick={closePlayer}
               aria-label="Close audio player"
-              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition active:scale-90"
+              className="p-2 rounded-xl text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/15 transition active:scale-90 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>

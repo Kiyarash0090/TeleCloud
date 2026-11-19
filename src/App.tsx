@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { TelegramProvider, useTelegram, useBackHandler } from './context/TelegramContext';
 import { QueueProvider, useQueue } from './context/QueueContext';
@@ -27,7 +27,14 @@ import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { FolderModal } from './components/FolderModal';
 import { AddToFolderModal } from './components/AddToFolderModal';
 import { getFolderColor, getFolderIcon } from './utils/folderHelpers';
-import { RotateCw, UploadCloud, LogOut, Loader2, Folder, Edit3, X } from 'lucide-react';
+import {
+  RotateCw,
+  UploadCloud,
+  LogOut,
+  Loader2,
+  Edit3,
+  X,
+} from 'lucide-react';
 
 function TeleCloudApp() {
   const {
@@ -71,9 +78,10 @@ function TeleCloudApp() {
     fetchFullUser,
     filteredChats,
     switchToNextChat,
+    chatSlideDirection,
+    chatTransitionId,
     isSelectionMode,
     activeFolder,
-    activeFolderId,
     setActiveFolderId,
     setFolderToEdit,
     setIsFolderModalOpen,
@@ -92,6 +100,102 @@ function TeleCloudApp() {
   const canHorizontalSwipeRef = useRef<boolean>(true);
   const [pullDistance, setPullDistance] = useState(0);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+  const [swipeOffsetX, setSwipeOffsetX] = useState(0);
+  const [isSwipeSnapping, setIsSwipeSnapping] = useState(false);
+  const tabViewportRef = useRef<HTMLDivElement>(null);
+  const tabContentRef = useRef<HTMLDivElement>(null);
+  const ghostHostRef = useRef<HTMLDivElement>(null);
+  const ghostTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const snapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const incomingStartOffsetRef = useRef<number>(0);
+
+  useEffect(() => {
+    const handleBeforeChatSwitch = (ev: Event) => {
+      const detail = (
+        ev as CustomEvent<{ direction: 'left' | 'right'; startOffsetX?: number }>
+      ).detail;
+      if (!detail) return;
+      const startOffset = detail.startOffsetX || 0;
+      incomingStartOffsetRef.current = startOffset;
+
+      const contentEl = tabContentRef.current;
+      const ghostHost = ghostHostRef.current;
+      if (!contentEl || !ghostHost) return;
+
+      if (ghostTimerRef.current) {
+        clearTimeout(ghostTimerRef.current);
+        ghostTimerRef.current = null;
+      }
+
+      const clone = contentEl.cloneNode(true) as HTMLElement;
+      clone.style.transform = `translate3d(${startOffset}px, 0, 0)`;
+      clone.style.transition = 'none';
+      clone.style.willChange = 'transform, opacity';
+
+      ghostHost.innerHTML = '';
+      ghostHost.appendChild(clone);
+
+      const targetX = detail.direction === 'left' ? '-100%' : '100%';
+      const startOpacity = Math.max(0.7, 1 - Math.abs(startOffset) / 480);
+
+      clone.animate(
+        [
+          { transform: `translate3d(${startOffset}px, 0, 0)`, opacity: startOpacity },
+          { transform: `translate3d(${targetX}, 0, 0)`, opacity: 0.35 },
+        ],
+        {
+          duration: 240,
+          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+          fill: 'forwards',
+        }
+      );
+
+      ghostTimerRef.current = setTimeout(() => {
+        if (ghostHostRef.current) {
+          ghostHostRef.current.innerHTML = '';
+        }
+        ghostTimerRef.current = null;
+      }, 250);
+    };
+
+    window.addEventListener('telecloud-before-chat-switch', handleBeforeChatSwitch);
+    return () => {
+      window.removeEventListener('telecloud-before-chat-switch', handleBeforeChatSwitch);
+      if (ghostTimerRef.current) clearTimeout(ghostTimerRef.current);
+      if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (chatTransitionId === 0) return;
+    const contentEl = tabContentRef.current;
+    if (!contentEl || !chatSlideDirection) return;
+
+    const startOffset = incomingStartOffsetRef.current;
+    incomingStartOffsetRef.current = 0;
+
+    contentEl.getAnimations().forEach((a) => a.cancel());
+
+    const fromX =
+      chatSlideDirection === 'left'
+        ? startOffset
+          ? `calc(100% + ${startOffset}px)`
+          : '100%'
+        : startOffset
+        ? `calc(-100% + ${startOffset}px)`
+        : '-100%';
+
+    contentEl.animate(
+      [
+        { transform: `translate3d(${fromX}, 0, 0)` },
+        { transform: 'translate3d(0, 0, 0)' },
+      ],
+      {
+        duration: 240,
+        easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      }
+    );
+  }, [chatTransitionId, chatSlideDirection]);
 
   const handleMainTouchStart = (e: React.TouchEvent<HTMLElement>) => {
     if (
@@ -112,6 +216,7 @@ function TeleCloudApp() {
 
     const target = e.target as HTMLElement | null;
     const isExcludedFromHorizontal = Boolean(
+      activeFolder ||
       target?.closest(
         'header, [data-header], [data-chat-switcher], [data-quick-filters], [data-no-swipe], button, input, select, textarea, .overflow-x-auto, [role="tablist"], [role="tab"]'
       )
@@ -120,6 +225,11 @@ function TeleCloudApp() {
 
     const touch = e.touches[0];
     if (!touch) return;
+    if (snapTimerRef.current) {
+      clearTimeout(snapTimerRef.current);
+      snapTimerRef.current = null;
+    }
+    setIsSwipeSnapping(false);
     touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
     swipeGestureTypeRef.current = null;
     horizontalSwipeDeltaRef.current = 0;
@@ -145,12 +255,14 @@ function TeleCloudApp() {
         }
       } else if (
         canHorizontalSwipeRef.current &&
-        Math.abs(deltaX) > Math.abs(deltaY) * 1.3 &&
-        Math.abs(deltaX) > 12 &&
+        Math.abs(deltaX) > Math.abs(deltaY) * 1.2 &&
+        Math.abs(deltaX) > 10 &&
         activeTab === 'files' &&
+        !activeFolder &&
         filteredChats.length > 1
       ) {
         swipeGestureTypeRef.current = 'horizontal';
+        setIsSwipeSnapping(false);
       }
     }
 
@@ -169,12 +281,14 @@ function TeleCloudApp() {
       }
     } else if (swipeGestureTypeRef.current === 'horizontal') {
       horizontalSwipeDeltaRef.current = deltaX;
+      setSwipeOffsetX(deltaX);
     }
   };
 
   const handleMainTouchEnd = async () => {
     const gestureType = swipeGestureTypeRef.current;
     const currentDelta = horizontalSwipeDeltaRef.current;
+    const startTime = touchStartRef.current?.time || Date.now();
 
     touchStartRef.current = null;
     swipeGestureTypeRef.current = null;
@@ -204,8 +318,28 @@ function TeleCloudApp() {
         setPullDistance(0);
       }
     } else if (gestureType === 'horizontal') {
-      if (Math.abs(currentDelta) >= 42 && filteredChats.length > 1) {
-        switchToNextChat(currentDelta < 0 ? 'next' : 'prev');
+      const elapsed = Math.max(16, Date.now() - startTime);
+      const velocity = Math.abs(currentDelta) / elapsed;
+      const shouldSwitch =
+        filteredChats.length > 1 &&
+        !activeFolder &&
+        (Math.abs(currentDelta) >= 48 || (Math.abs(currentDelta) >= 22 && velocity >= 0.35));
+
+      if (shouldSwitch) {
+        setSwipeOffsetX(0);
+        setIsSwipeSnapping(false);
+        switchToNextChat(currentDelta < 0 ? 'next' : 'prev', currentDelta);
+      } else if (currentDelta !== 0) {
+        setIsSwipeSnapping(true);
+        setSwipeOffsetX(0);
+        if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
+        snapTimerRef.current = setTimeout(() => {
+          setIsSwipeSnapping(false);
+          snapTimerRef.current = null;
+        }, 220);
+      } else {
+        setSwipeOffsetX(0);
+        setIsSwipeSnapping(false);
       }
     }
   };
@@ -259,7 +393,7 @@ function TeleCloudApp() {
   const isSavedMessages = !activePeer || activePeer === 'me';
   const targetDisplayTitle = isSavedMessages
     ? lang === 'fa'
-      ? 'سیو مسیج'
+      ? 'پیام‌های ذخیره‌شده'
       : 'Saved Messages'
     : activeChatTitle || activePeer;
 
@@ -277,11 +411,11 @@ function TeleCloudApp() {
 
   if (isWebAuthLoading) {
     return (
-      <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col items-center justify-center p-4">
-        <div className="w-16 h-16 rounded-3xl bg-white/10 backdrop-blur-md flex items-center justify-center mb-4 p-3 border border-white/10 shadow-2xl">
+      <div className="fixed inset-0 z-50 bg-[#090B10] flex flex-col items-center justify-center p-4">
+        <div className="w-14 h-14 rounded-2xl bg-[#11141C] flex items-center justify-center mb-4 p-2.5 border border-white/[0.08] shadow-2xl">
           <img src="/favicon-96x96.png" alt="Logo" className="w-full h-full object-contain" />
         </div>
-        <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+        <Loader2 className="w-5 h-5 animate-spin text-sky-400" />
       </div>
     );
   }
@@ -328,7 +462,7 @@ function TeleCloudApp() {
   };
 
   return (
-    <div className="h-dvh flex flex-col bg-[#f8fafd] dark:bg-[#131314] text-slate-800 dark:text-[#e3e3e3] font-sans antialiased transition-colors duration-200 overflow-hidden">
+    <div className="h-dvh flex flex-col bg-[#F4F6FA] dark:bg-[#090B10] text-slate-900 dark:text-slate-100 font-sans antialiased transition-colors duration-200 overflow-hidden">
       {/* Top Responsive Header */}
       <Header onToggleMobileMenu={() => setIsMobileMenuOpen(true)} />
 
@@ -340,10 +474,10 @@ function TeleCloudApp() {
         {isMobileMenuOpen && (
           <div className="fixed inset-0 z-50 md:hidden flex">
             <div 
-              className="fixed inset-0 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200"
+              className="fixed inset-0 bg-black/55 backdrop-blur-xs animate-in fade-in duration-200"
               onClick={() => setIsMobileMenuOpen(false)}
             />
-            <div className="relative z-10 w-72 max-w-[85vw] h-full bg-white dark:bg-[#141418] shadow-2xl flex flex-col animate-in slide-in-from-start duration-200">
+            <div className="relative z-10 w-72 max-w-[85vw] h-full bg-white dark:bg-[#11141C] shadow-2xl flex flex-col animate-in slide-in-from-start duration-200">
               <Sidebar className="flex w-full h-full border-e-0" onClose={() => setIsMobileMenuOpen(false)} />
             </div>
           </div>
@@ -360,18 +494,18 @@ function TeleCloudApp() {
           onDragOver={handleWorkspaceDragOver}
           onDragLeave={handleWorkspaceDragLeave}
           onDrop={handleWorkspaceDrop}
-          className={`flex-1 p-2.5 sm:p-5 md:p-7 overflow-y-auto overflow-x-hidden overscroll-y-contain relative ${
+          className={`flex-1 p-3 sm:p-5 lg:p-6 overflow-y-auto overflow-x-hidden overscroll-y-contain relative ${
             activeAudio ? 'pb-44 md:pb-32' : 'pb-24 md:pb-14'
           }`}
         >
-          {/* Standard Native-Style Pull-to-Refresh Indicator (No extra text) */}
+          {/* Pull-to-Refresh Indicator */}
           {(pullDistance > 0 || isPullRefreshing) && (
             <div
               className="flex items-center justify-center overflow-hidden transition-all duration-150 pointer-events-none"
               style={{ height: isPullRefreshing ? 48 : pullDistance }}
             >
               <div
-                className={`w-9 h-9 rounded-full bg-white dark:bg-zinc-800 border border-slate-200/90 dark:border-zinc-700 shadow-md flex items-center justify-center transition-transform ${
+                className={`w-9 h-9 rounded-full bg-white dark:bg-[#171B26] border border-slate-200/90 dark:border-white/[0.08] shadow-md flex items-center justify-center transition-transform ${
                   pullDistance >= 54 || isPullRefreshing ? 'scale-100' : 'scale-90 opacity-85'
                 }`}
               >
@@ -388,18 +522,19 @@ function TeleCloudApp() {
               </div>
             </div>
           )}
-          {/* Full Workspace Drag & Drop Active Overlay (In any writable chat) */}
+
+          {/* Full Workspace Drag & Drop Active Overlay */}
           {canUploadInActiveChat && isWorkspaceDragging && (
-            <div className="absolute inset-2 z-50 bg-blue-600/10 dark:bg-blue-500/15 backdrop-blur-md border-4 border-dashed border-blue-500 dark:border-blue-400 rounded-3xl flex flex-col items-center justify-center text-center p-8 transition-all animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
-              <div className="w-20 h-20 rounded-3xl bg-blue-600 text-white flex items-center justify-center shadow-2xl shadow-blue-500/40 mb-4 animate-bounce">
-                <UploadCloud className="w-10 h-10" />
+            <div className="absolute inset-3 z-50 bg-blue-600/10 dark:bg-sky-500/10 backdrop-blur-md border-2 border-dashed border-blue-500 dark:border-sky-400 rounded-3xl flex flex-col items-center justify-center text-center p-8 transition-all animate-in fade-in zoom-in-95 duration-150 pointer-events-none">
+              <div className="w-16 h-16 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-blue-600/30 mb-4 animate-bounce">
+                <UploadCloud className="w-8 h-8" />
               </div>
-              <h3 className="text-xl sm:text-2xl font-black text-blue-700 dark:text-blue-300 mb-2">
+              <h3 className="text-lg sm:text-xl font-bold text-blue-700 dark:text-sky-300 mb-1.5">
                 {lang === 'fa'
                   ? `فایل‌ها را اینجا رها کنید تا به «${targetDisplayTitle}» ارسال شوند`
                   : `Drop files to upload to "${targetDisplayTitle}"`}
               </h3>
-              <p className="text-sm text-slate-600 dark:text-zinc-300 max-w-md font-medium">
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 max-w-md font-medium">
                 {lang === 'fa' 
                   ? 'فایل‌های شما به طور خودکار در صف آپلود بدون دیسک قرار می‌گیرند.' 
                   : 'Your files will be automatically queued for zero-disk RAM streaming to Telegram.'}
@@ -410,17 +545,17 @@ function TeleCloudApp() {
           {activeTab === 'account' ? (
             <AccountPage />
           ) : (
-            <>
+            <div className="max-w-[1600px] mx-auto">
               {/* Active Folder Header Banner */}
               {activeFolder && (
-                <div className="mb-2.5 sm:mb-3 px-3.5 sm:px-4 py-2.5 rounded-2xl bg-white/90 dark:bg-[#18191d]/90 backdrop-blur-md border border-slate-200/80 dark:border-zinc-800/80 shadow-2xs flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                  <div className="flex items-center gap-2.5 min-w-0">
+                <div className="mb-3 px-4 py-3 rounded-2xl bg-white dark:bg-[#11141C] border border-slate-200/80 dark:border-white/[0.075] shadow-[var(--shadow-card)] flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="flex items-center gap-3 min-w-0">
                     {(() => {
                       const colorConfig = getFolderColor(activeFolder.color);
                       const FolderIcon = getFolderIcon(activeFolder.icon);
                       return (
                         <div
-                          className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${colorConfig.bgClass} ${colorConfig.textClass}`}
+                          className={`w-9.5 h-9.5 rounded-xl flex items-center justify-center shrink-0 ${colorConfig.bgClass} ${colorConfig.textClass}`}
                         >
                           <FolderIcon className="w-5 h-5" />
                         </div>
@@ -428,14 +563,14 @@ function TeleCloudApp() {
                     })()}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <h2 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
+                        <h2 className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">
                           {activeFolder.name}
                         </h2>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border border-slate-200/60 dark:border-zinc-700/60 shrink-0">
-                          {activeFolder.files.length} {lang === 'fa' ? 'فایل' : 'files'}
+                        <span className="text-xs font-mono tabular-nums text-slate-400 dark:text-slate-500 shrink-0">
+                          · {activeFolder.files.length} {lang === 'fa' ? 'فایل' : 'files'}
                         </span>
                       </div>
-                      <span className="text-[10px] text-slate-400 dark:text-zinc-500 block truncate">
+                      <span className="text-[11px] text-slate-400 dark:text-slate-500 block truncate">
                         {lang === 'fa' ? 'پوشه اختصاصی شما' : 'Custom user folder'}
                       </span>
                     </div>
@@ -447,7 +582,7 @@ function TeleCloudApp() {
                         setFolderToEdit(activeFolder);
                         setIsFolderModalOpen(true);
                       }}
-                      className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-sky-400 text-xs font-semibold flex items-center gap-1 transition cursor-pointer active:scale-95"
+                      className="px-3 py-1.5 rounded-xl bg-[#F4F6FA] hover:bg-slate-200/80 dark:bg-[#171B26] dark:hover:bg-white/[0.08] text-slate-700 dark:text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer active:scale-95 whitespace-nowrap"
                       title={t('editFolder')}
                     >
                       <Edit3 className="w-3.5 h-3.5" />
@@ -456,7 +591,7 @@ function TeleCloudApp() {
 
                     <button
                       onClick={() => setActiveFolderId(null)}
-                      className="p-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 dark:bg-zinc-800 dark:hover:bg-rose-950/40 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer active:scale-90"
+                      className="p-1.5 rounded-xl bg-[#F4F6FA] hover:bg-rose-50 dark:bg-[#171B26] dark:hover:bg-rose-500/10 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer active:scale-90"
                       title={t('exitFolder')}
                     >
                       <X className="w-4 h-4" />
@@ -465,77 +600,122 @@ function TeleCloudApp() {
                 </div>
               )}
 
-              {/* Quick Channels & Chats Switcher Bar (Main Page & Mobile) */}
+              {/* Quick Channels & Chats Switcher Bar */}
               {activeTab === 'files' && !activeFolder && <ChatQuickSwitcher />}
 
-              {/* Category & Format Filters */}
-              <QuickFilters />
+              {/* Sliding Tab Content Viewport (Telegram-style horizontal page transition) */}
+              <div ref={tabViewportRef} className="relative overflow-x-clip px-1 -mx-1">
+                {/* Outgoing tab ghost during directional slide */}
+                <div
+                  ref={ghostHostRef}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 px-1 overflow-hidden z-10"
+                />
 
-              {/* Background refresh progress indicator when files are already loaded */}
-              {isLoading && files.length > 0 && !isPullRefreshing && activeTab === 'files' && (
-                <div className="w-full h-1 bg-blue-500/10 dark:bg-blue-400/10 rounded-full overflow-hidden mb-3 animate-in fade-in duration-200">
-                  <div className="h-full bg-blue-600 dark:bg-sky-400 rounded-full animate-pulse w-full" />
-                </div>
-              )}
+                {/* Active tab content with live finger-follow drag */}
+                <div
+                  ref={tabContentRef}
+                  style={
+                    swipeOffsetX !== 0 || isSwipeSnapping
+                      ? {
+                          transform: `translate3d(${swipeOffsetX}px, 0, 0)`,
+                          opacity: Math.max(0.72, 1 - Math.abs(swipeOffsetX) / 480),
+                          transition: isSwipeSnapping
+                            ? 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease'
+                            : 'none',
+                          willChange: 'transform, opacity',
+                        }
+                      : undefined
+                  }
+                >
+                  {/* Category & Format Filters */}
+                  <QuickFilters />
 
-              {/* Loading Spinner: Only shown on cold load when there are no files in memory and not pull-to-refreshing */}
-              {isLoading && files.length === 0 && !isPullRefreshing && activeTab === 'files' ? (
-                <div className="flex flex-col items-center justify-center py-20 text-center">
-                  <RotateCw className="w-8 h-8 text-blue-500 animate-spin mb-3" />
-                  <p className="text-xs font-semibold text-slate-500 dark:text-zinc-400">
-                    {lang === 'fa'
-                      ? 'در حال دریافت فایل‌ها از تلگرام...'
-                      : 'Streaming files from Telegram...'}
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div key={activePeer} className="transition-all duration-200 animate-in fade-in">
-                    {viewMode === 'grid' ? (
-                      <FileGrid files={filteredFiles} />
-                    ) : (
-                      <FileList files={filteredFiles} />
-                    )}
-                  </div>
-
-                  {/* Infinite Scroll Sentinel & Channel Pagination Bar */}
-                  {hasMoreFiles && activeTab === 'files' && (
-                    <div
-                      ref={loadMoreSentinelRef}
-                      className="mt-6 mb-2 flex flex-col sm:flex-row items-center justify-between gap-3 py-3 px-4 rounded-2xl bg-white/70 dark:bg-[#18191d]/70 border border-slate-200/80 dark:border-zinc-800/80 backdrop-blur-md shadow-2xs"
-                    >
-                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-zinc-300">
-                        {isLoadingMore ? (
-                          <RotateCw className="w-4 h-4 text-blue-500 animate-spin shrink-0" />
-                        ) : (
-                          <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                        )}
-                        <span>
-                          {isLoadingMore
-                            ? lang === 'fa'
-                              ? `در حال دریافت فایل‌های بیشتر... (${files.length} فایل تا اینجا)`
-                              : `Loading more files... (${files.length} loaded so far)`
-                            : lang === 'fa'
-                            ? `${files.length} فایل نمایش داده شده (فایل‌های قدیمی‌تر در چت موجود است)`
-                            : `${files.length} files displayed (more available in chat)`}
-                        </span>
-                      </div>
-
-                      <button
-                        onClick={() => loadMoreFiles()}
-                        disabled={isLoadingMore}
-                        className="w-full sm:w-auto px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition active:scale-95 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
-                      >
-                        {isLoadingMore ? (
-                          <RotateCw className="w-3.5 h-3.5 animate-spin shrink-0" />
-                        ) : null}
-                        <span>{lang === 'fa' ? 'بارگذاری دسته بعدی' : 'Load Next Batch'}</span>
-                      </button>
+                  {/* Background refresh progress bar */}
+                  {isLoading && files.length > 0 && !isPullRefreshing && activeTab === 'files' && (
+                    <div className="w-full h-0.5 bg-blue-500/10 dark:bg-sky-400/10 rounded-full overflow-hidden mb-3">
+                      <div className="h-full bg-blue-600 dark:bg-sky-400 rounded-full animate-pulse w-full" />
                     </div>
                   )}
-                </>
-              )}
-            </>
+
+                  {/* Cold Load Skeleton Placeholders */}
+                  {isLoading && files.length === 0 && !isPullRefreshing && activeTab === 'files' ? (
+                    viewMode === 'grid' ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3.5 sm:gap-4">
+                        {Array.from({ length: 12 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className="rounded-2xl bg-white dark:bg-[#11141C] border border-slate-200/75 dark:border-white/[0.06] overflow-hidden animate-pulse"
+                          >
+                            <div className="aspect-16/10 w-full bg-[#ECEFF5] dark:bg-[#171B26]" />
+                            <div className="p-3 space-y-2">
+                              <div className="h-3.5 w-3/4 rounded-md bg-[#ECEFF5] dark:bg-[#171B26]" />
+                              <div className="h-2.5 w-1/2 rounded-md bg-[#ECEFF5] dark:bg-[#171B26]" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-white dark:bg-[#11141C] rounded-2xl border border-slate-200/75 dark:border-white/[0.06] divide-y divide-slate-100 dark:divide-white/[0.05] overflow-hidden animate-pulse">
+                        {Array.from({ length: 8 }).map((_, i) => (
+                          <div key={i} className="flex items-center gap-3 p-3.5">
+                            <div className="w-9.5 h-9.5 rounded-xl bg-[#ECEFF5] dark:bg-[#171B26] shrink-0" />
+                            <div className="flex-1 space-y-1.5">
+                              <div className="h-3.5 w-48 max-w-full rounded bg-[#ECEFF5] dark:bg-[#171B26]" />
+                              <div className="h-2.5 w-28 rounded bg-[#ECEFF5] dark:bg-[#171B26]" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    <>
+                      <div key={activePeer}>
+                        {viewMode === 'grid' ? (
+                          <FileGrid files={filteredFiles} />
+                        ) : (
+                          <FileList files={filteredFiles} />
+                        )}
+                      </div>
+
+                      {/* Infinite Scroll Sentinel & Channel Pagination Bar */}
+                      {hasMoreFiles && activeTab === 'files' && (
+                        <div
+                          ref={loadMoreSentinelRef}
+                          className="mt-6 mb-2 flex flex-col sm:flex-row items-center justify-between gap-3 py-3 px-4 rounded-2xl bg-white dark:bg-[#11141C] border border-slate-200/80 dark:border-white/[0.075] shadow-[var(--shadow-card)]"
+                        >
+                          <div className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300 tabular-nums">
+                            {isLoadingMore && (
+                              <RotateCw className="w-4 h-4 text-blue-500 animate-spin shrink-0" />
+                            )}
+                            <span>
+                              {isLoadingMore
+                                ? lang === 'fa'
+                                  ? `در حال دریافت فایل‌های بیشتر... (${files.length} فایل تا اینجا)`
+                                  : `Loading more files... (${files.length} loaded)`
+                                : lang === 'fa'
+                                ? `${files.length} فایل نمایش داده شده (فایل‌های قدیمی‌تر موجود است)`
+                                : `${files.length} files displayed (more available)`}
+                            </span>
+                          </div>
+
+                          <button
+                            onClick={() => loadMoreFiles()}
+                            disabled={isLoadingMore}
+                            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition active:scale-95 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 whitespace-nowrap"
+                          >
+                            {isLoadingMore && (
+                              <RotateCw className="w-3.5 h-3.5 animate-spin shrink-0" />
+                            )}
+                            <span>{lang === 'fa' ? 'بارگذاری دسته بعدی' : 'Load Next Batch'}</span>
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </main>
       </div>

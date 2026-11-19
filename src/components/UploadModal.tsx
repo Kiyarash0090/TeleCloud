@@ -32,28 +32,28 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 select-none animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 bg-slate-950/60 dark:bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 select-none animate-in fade-in duration-150"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white dark:bg-[#1e1f20] w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl border-t sm:border border-slate-200 dark:border-zinc-800 shadow-2xl overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 max-h-[90dvh] flex flex-col"
+        className="bg-white dark:bg-[#11141C] w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl border-t sm:border border-slate-200/80 dark:border-white/[0.08] shadow-2xl shadow-slate-900/20 dark:shadow-black/70 overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 max-h-[90dvh] flex flex-col"
       >
         {/* Mobile Drag Handle */}
         <div className="sm:hidden flex justify-center pt-2.5 pb-1">
-          <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-zinc-700" />
+          <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-white/20" />
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3.5 sm:px-5 sm:py-4 border-b border-slate-100 dark:border-zinc-800">
+        <div className="flex items-center justify-between px-4 py-3.5 sm:px-5 sm:py-4 border-b border-slate-100 dark:border-white/[0.06]">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-sky-400 flex items-center justify-center shrink-0">
               <FileUp className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">
+              <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 truncate">
                 {t('upload')}
               </h3>
-              <p className="text-[11px] text-slate-400 dark:text-zinc-500 flex items-center gap-1 truncate">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 truncate">
                 <Cpu className="w-3 h-3 text-emerald-500 shrink-0" />
                 <span className="truncate">{t('zeroDiskNotice')}</span>
               </p>
@@ -61,7 +61,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-90"
+            className="w-9 h-9 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06] flex items-center justify-center active:scale-90 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -71,7 +71,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
         <div className="p-4 sm:p-6 space-y-4 overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-6">
           {/* Connection & Destination Status Banner */}
           {isConnected ? (
-            <div className="flex items-center justify-between gap-2 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-300 text-xs">
+            <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-500/10 border border-emerald-200/80 dark:border-emerald-500/25 text-emerald-800 dark:text-emerald-300 text-xs">
               <div className="flex items-center gap-2 font-medium min-w-0">
                 <Sparkles className="w-4 h-4 text-emerald-500 shrink-0" />
                 <span className="truncate" dir="auto">
@@ -80,12 +80,12 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
                     : `Direct upload to: ${targetDisplayTitle}`}
                 </span>
               </div>
-              <span className="font-mono font-bold bg-emerald-100 dark:bg-emerald-900/50 px-2 py-0.5 rounded-md shrink-0">
+              <span className="font-mono tabular-nums font-bold text-emerald-700 dark:text-emerald-300 shrink-0">
                 2 GB
               </span>
             </div>
           ) : (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-300 text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3.5 rounded-xl bg-amber-50/90 dark:bg-amber-500/10 border border-amber-200/80 dark:border-amber-500/25 text-amber-800 dark:text-amber-300 text-xs">
               <div className="flex items-center gap-2">
                 <Lock className="w-4 h-4 text-amber-500 shrink-0" />
                 <span>
@@ -103,7 +103,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
                   onClose();
                   setIsLoginModalOpen(true);
                 }}
-                className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold shrink-0 transition-colors active:scale-95 text-center"
+                className="min-h-[36px] px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold shrink-0 transition-colors active:scale-95 text-center cursor-pointer"
               >
                 {t('connectTelegram')}
               </button>
@@ -125,8 +125,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
             onClick={() => fileInputRef.current?.click()}
             className={`border-2 border-dashed rounded-2xl p-6 sm:p-9 text-center cursor-pointer transition-all active:scale-[0.99] ${
               isDragging
-                ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/30'
-                : 'border-slate-300 dark:border-zinc-700 hover:border-blue-400 dark:hover:border-blue-500/60 bg-slate-50/60 dark:bg-zinc-800/40'
+                ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-500/10'
+                : 'border-slate-300/90 dark:border-white/[0.12] hover:border-blue-400 dark:hover:border-sky-400/50 bg-[#F4F6FA] dark:bg-[#171B26]'
             }`}
           >
             <input
@@ -136,13 +136,13 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
               onChange={(e) => handleFiles(e.target.files)}
               className="hidden"
             />
-            <div className="w-14 h-14 mx-auto mb-3.5 rounded-2xl bg-blue-100 dark:bg-blue-950/80 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-inner">
+            <div className="w-14 h-14 mx-auto mb-3.5 rounded-2xl bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-sky-400 flex items-center justify-center">
               <UploadCloud className="w-7 h-7" />
             </div>
-            <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-zinc-200 mb-1.5">
+            <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 mb-1.5">
               {t('dragDropText')}
             </p>
-            <p className="text-[11px] sm:text-xs text-slate-400 dark:text-zinc-500">
+            <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
               {lang === 'fa'
                 ? 'پشتیبانی از تمامی فرمت‌ها (ویدیو، موزیک، عکس، سند، فشرده) تا سقف ۲ گیگابایت'
                 : 'Supports all file formats (Video, Audio, Photo, Docs, ZIP) up to 2 GB'}

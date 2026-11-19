@@ -14,14 +14,12 @@ import {
   Sun,
   Moon,
   CheckCircle2,
-  ArrowRight,
   LogOut,
   UploadCloud,
   MessageSquare,
   ChevronDown,
   UserPlus,
   Loader2,
-  Users,
   Link2,
   Info,
   Star,
@@ -53,9 +51,8 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
     isSwitchingAccount,
     switchAccount,
     removeAccount,
-        isConnected,
+    isConnected,
     isDemoMode,
-    activePeer,
     activeChatTitle,
     canUploadInActiveChat,
     setIsChatSelectorOpen,
@@ -66,7 +63,6 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
     setIsFolderModalOpen,
     setFolderToEdit,
   } = useTelegram();
-
 
   const { t, lang, setLang, isDark, toggleTheme } = useTheme();
 
@@ -89,11 +85,6 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
     setActiveFolderId(null);
     setSelectedCategory(id);
     setSelectedExtension(null);
-    onClose?.();
-  };
-
-  const handleSelectAccount = () => {
-    setActiveTab('account');
     onClose?.();
   };
 
@@ -136,80 +127,61 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
       ? `/api/telegram/profile-photo?uid=${encodeURIComponent(user.id)}`
       : null);
 
+  // Compute proportional storage bar segments from real stats
+  const totalBytes = stats?.totalSize || 0;
+  const storageSegments = totalBytes > 0 && stats
+    ? [
+        { key: 'videos', size: stats.categories.videos.size, color: 'bg-blue-500', label: t('videos').split(' ')[0] },
+        { key: 'images', size: stats.categories.images.size, color: 'bg-rose-500', label: t('images').split(' ')[0] },
+        { key: 'audio', size: stats.categories.audio.size, color: 'bg-emerald-500', label: t('audio').split(' ')[0] },
+        { key: 'documents', size: stats.categories.documents.size, color: 'bg-amber-500', label: t('documents').split(' ')[0] },
+        { key: 'archives', size: stats.categories.archives.size + stats.categories.other.size, color: 'bg-violet-500', label: t('archives').split(' ')[0] },
+      ].filter((s) => s.size > 0)
+    : [];
+
   return (
     <aside
-      className={`relative w-64 lg:w-72 h-full bg-white dark:bg-[#131418] border-e border-slate-200/80 dark:border-zinc-800/80 p-4 lg:p-5 flex-col justify-between shrink-0 select-none ${className || ''}`}
+      className={`relative w-64 lg:w-[272px] h-full bg-white dark:bg-[#11141C] border-e border-slate-200/85 dark:border-white/[0.075] p-3.5 sm:p-4 flex-col justify-between shrink-0 select-none ${className || ''}`}
     >
-      {/* Top Header & Navigation */}
+      {/* Top Scrollable Area */}
       <div className="flex flex-col flex-1 min-h-0 overflow-y-auto no-scrollbar">
-        {/* Brand & Mobile Close */}
-        <div className="flex items-center justify-between md:justify-center pb-4 mb-4 border-b border-slate-100 dark:border-zinc-800/80 md:hidden">
+        {/* Mobile Brand Header */}
+        <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-slate-100 dark:border-white/[0.06] md:hidden">
           <div
             onClick={() => {
               setActiveTab('files');
+              setActiveFolderId(null);
               setSelectedCategory('all');
               setSelectedExtension(null);
               onClose?.();
             }}
-            className="flex items-center gap-3 cursor-pointer group"
+            className="flex items-center gap-2.5 cursor-pointer"
           >
-            <div className="w-10 h-10 rounded-2xl bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform overflow-hidden p-1.5">
-              <img src="/favicon-96x96.png" alt="Logo" className="w-full h-full object-contain" />
+            <div className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-[#171B26] border border-slate-200/80 dark:border-white/[0.08] flex items-center justify-center overflow-hidden p-1.5">
+              <img src="/favicon-96x96.png" alt={t('appName')} className="w-full h-full object-contain" />
             </div>
-            <div className="md:hidden">
-              <div className="flex items-center gap-1.5">
-                <span className="font-black text-sm lg:text-base text-slate-900 dark:text-white tracking-tight leading-tight">
-                  {t('appName')}
-                </span>
-                {isConnected && (
-                  <span
-                    className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"
-                    title="Connected & Synced"
-                  />
-                )}
-              </div>
-              <span className="text-[11px] text-blue-600 dark:text-sky-400 font-medium">
-                Telegram Saved Messages
+            <div>
+              <span className="font-bold text-sm text-slate-900 dark:text-slate-100 tracking-tight block leading-tight">
+                {t('appName')}
+              </span>
+              <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                {t('tagline')}
               </span>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 active:scale-95 md:hidden"
+            className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06] active:scale-95 transition cursor-pointer"
             aria-label="Close menu"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* ================================================================= */}
-        {/* Multi-Account Switcher & Add Account Section (Top of Sidebar)     */}
-        {/* ================================================================= */}
-        <div className="mb-3.5">
-          <div className="flex items-center justify-between px-1.5 mb-1.5">
-            <span className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-blue-500" />
-              <span>{t('accounts')}</span>
-              {accounts.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-md bg-blue-500/10 text-blue-600 dark:text-sky-400 font-mono text-[10px]">
-                  {accounts.length}
-                </span>
-              )}
-            </span>
-
-            <button
-              onClick={handleAddAccount}
-              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-sky-400 hover:text-blue-700 dark:hover:text-sky-300 px-1.5 py-0.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
-              title={t('addAccount')}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>{t('addAccount')}</span>
-            </button>
-          </div>
-
-          <div className="rounded-2xl bg-slate-50/90 dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800/90 overflow-hidden transition-all shadow-2xs">
-            {/* Active Account Trigger Row */}
+        {/* Account Switcher Panel */}
+        <div className="mb-3">
+          <div className="rounded-2xl bg-[#F4F6FA] dark:bg-[#171B26] border border-slate-200/75 dark:border-white/[0.07] overflow-hidden transition-colors">
             <div
               onClick={() => {
                 if (accounts.length > 0 || isConnected || isDemoMode) {
@@ -218,11 +190,11 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                   handleAddAccount();
                 }
               }}
-              className="p-2.5 flex items-center justify-between gap-2 hover:bg-slate-100/80 dark:hover:bg-zinc-800/70 transition cursor-pointer"
+              className="p-2.5 flex items-center justify-between gap-2 hover:bg-slate-200/45 dark:hover:bg-white/[0.04] transition cursor-pointer"
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="relative shrink-0">
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-sky-500 text-white overflow-hidden flex items-center justify-center font-bold text-xs shadow-xs">
+                  <div className="w-9 h-9 rounded-xl bg-blue-600 text-white overflow-hidden flex items-center justify-center font-bold text-xs shadow-2xs">
                     {userPhoto && !failedPhotos[user?.id || 'active'] ? (
                       <img
                         src={userPhoto}
@@ -237,7 +209,8 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                     )}
                   </div>
                   <span
-                    className={`absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-zinc-900 ${
+                    title={isConnected ? 'Live Connection' : isDemoMode ? 'Demo' : 'Disconnected'}
+                    className={`absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#F4F6FA] dark:border-[#171B26] ${
                       isConnected
                         ? 'bg-emerald-500'
                         : isDemoMode
@@ -248,18 +221,16 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                 </div>
 
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-slate-900 dark:text-zinc-100 truncate">
-                      {userName} {user?.lastName || ''}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-slate-500 dark:text-zinc-400 font-mono truncate block dir-ltr text-start">
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate block leading-snug">
+                    {userName} {user?.lastName || ''}
+                  </span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate block dir-ltr text-start">
                     {user?.username
                       ? `@${user.username}`
                       : user?.phone
                       ? user.phone
                       : isConnected
-                      ? 'Telegram Connected'
+                      ? 'Connected'
                       : isDemoMode
                       ? t('demoModeActive')
                       : t('connectTelegram')}
@@ -267,7 +238,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                 </div>
               </div>
 
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center gap-0.5 shrink-0">
                 <button
                   type="button"
                   onClick={(e) => {
@@ -275,27 +246,26 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                     setActiveTab('account');
                     onClose?.();
                   }}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-sky-400 hover:bg-slate-200/70 dark:hover:bg-zinc-800 transition active:scale-90 cursor-pointer"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-sky-400 hover:bg-slate-200/70 dark:hover:bg-white/[0.08] transition cursor-pointer"
                   title={lang === 'fa' ? 'اطلاعات اکانت' : 'Account Info'}
                 >
                   <Info className="w-3.5 h-3.5" />
                 </button>
 
                 {isSwitchingAccount ? (
-                  <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                  <Loader2 className="w-4 h-4 text-blue-500 animate-spin mx-1" />
                 ) : (
                   <ChevronDown
-                    className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
-                      isAccountListOpen ? 'rotate-180 text-blue-500' : ''
+                    className={`w-4 h-4 text-slate-400 transition-transform duration-150 ${
+                      isAccountListOpen ? 'rotate-180 text-blue-600 dark:text-sky-400' : ''
                     }`}
                   />
                 )}
               </div>
             </div>
 
-            {/* Collapsible Multi-Account List */}
             {isAccountListOpen && (
-              <div className="border-t border-slate-200/70 dark:border-zinc-800/80 p-1.5 space-y-1 bg-white/60 dark:bg-zinc-950/40 animate-in slide-in-from-top-1 duration-150">
+              <div className="border-t border-slate-200/70 dark:border-white/[0.06] p-1.5 space-y-1 bg-white dark:bg-[#11141C] animate-in slide-in-from-top-1 duration-150">
                 {accounts.map((acc) => {
                   const isCurrent =
                     isConnected &&
@@ -315,8 +285,8 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                       onClick={() => handleSwitchAccount(acc.id)}
                       className={`group flex items-center justify-between gap-2 p-2 rounded-xl text-xs transition cursor-pointer ${
                         isCurrent
-                          ? 'bg-blue-600/10 dark:bg-sky-500/15 text-blue-700 dark:text-sky-300 font-bold'
-                          : 'hover:bg-slate-100 dark:hover:bg-zinc-800/80 text-slate-700 dark:text-zinc-300'
+                          ? 'bg-blue-600/10 dark:bg-sky-500/12 text-blue-700 dark:text-sky-300 font-semibold'
+                          : 'hover:bg-slate-100 dark:hover:bg-white/[0.05] text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -336,7 +306,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                         </div>
                         <div className="min-w-0">
                           <div className="truncate text-xs leading-tight">{accName}</div>
-                          <div className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 truncate dir-ltr text-start">
+                          <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500 truncate dir-ltr text-start">
                             {acc.user.username
                               ? `@${acc.user.username}`
                               : acc.user.phone || `ID: ${acc.id}`}
@@ -353,30 +323,8 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
 
                         <button
                           type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (isCurrent) {
-                              setActiveTab('account');
-                              onClose?.();
-                            } else {
-                              handleSwitchAccount(acc.id).then((ok) => {
-                                if (ok) {
-                                  setActiveTab('account');
-                                  onClose?.();
-                                }
-                              });
-                            }
-                          }}
-                          className="p-1 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-sky-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition active:scale-90 cursor-pointer"
-                          title={lang === 'fa' ? 'اطلاعات اکانت' : 'Account Info'}
-                        >
-                          <Info className="w-3.5 h-3.5" />
-                        </button>
-
-                        <button
-                          type="button"
                           onClick={(e) => handleRemoveAccount(e, acc.id)}
-                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+                          className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition cursor-pointer"
                           title={t('removeAccount')}
                         >
                           <LogOut className="w-3.5 h-3.5" />
@@ -386,11 +334,10 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                   );
                 })}
 
-                {/* Add Another Account Button inside Dropdown */}
                 <button
                   type="button"
                   onClick={handleAddAccount}
-                  className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-blue-50/80 hover:bg-blue-100/80 dark:bg-blue-950/30 dark:hover:bg-blue-900/40 text-blue-600 dark:text-sky-400 text-xs font-bold transition cursor-pointer"
+                  className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200/80 dark:bg-white/[0.05] dark:hover:bg-white/[0.09] text-blue-600 dark:text-sky-400 text-xs font-semibold transition cursor-pointer"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   <span>{t('addAccount')}</span>
@@ -400,73 +347,70 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
           </div>
         </div>
 
-        {/* Chat / Channel / Bot Switcher Button */}
-        <button
-          onClick={() => {
-            setIsChatSelectorOpen(true);
-            onClose?.();
-          }}
-          className="w-full mb-3 py-2.5 px-3.5 rounded-2xl bg-slate-100 dark:bg-zinc-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-slate-700 dark:text-zinc-200 hover:text-blue-600 dark:hover:text-blue-400 font-bold text-xs flex items-center justify-between transition-all border border-slate-200/80 dark:border-zinc-700/80 cursor-pointer shadow-2xs"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <MessageSquare className="w-4 h-4 text-blue-500 shrink-0" />
-            <span className="truncate">
-              {activeChatTitle || (lang === 'fa' ? 'پیام‌های ذخیره‌شده' : 'Saved Messages')}
-            </span>
-          </div>
-          <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-        </button>
-
-        {/* Primary Desktop Upload Action (Available in Saved Messages, Bots, PVs, Admin Channels, and Accessible Groups) */}
+        {/* Primary Upload Action */}
         {canUploadInActiveChat ? (
           <button
             onClick={() => {
               setIsUploadModalOpen(true);
               onClose?.();
             }}
-            className="w-full mb-2.5 py-3 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-500 hover:to-sky-400 text-white font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] cursor-pointer"
+            className="w-full mb-2.5 h-10.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs sm:text-sm shadow-sm shadow-blue-600/20 flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] cursor-pointer whitespace-nowrap"
           >
-            <UploadCloud className="w-5 h-5 stroke-[2.2]" />
+            <UploadCloud className="w-4.5 h-4.5 stroke-[2]" />
             <span>{t('upload')}</span>
           </button>
         ) : (
-          <div className="w-full mb-2.5 py-2.5 px-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 text-amber-700 dark:text-amber-300 text-[11px] font-bold flex items-center justify-center gap-2">
-            <span>
-              {lang === 'fa' ? 'حالت فقط خواندنی (بدون دسترسی آپلود)' : 'Read-Only Mode (No Upload Access)'}
-            </span>
+          <div className="w-full mb-2.5 h-10 px-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200/70 dark:border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-semibold flex items-center justify-center">
+            <span>{lang === 'fa' ? 'کانال فقط خواندنی' : 'Read-Only Channel'}</span>
           </div>
         )}
 
-        {/* Telegram Link Inspector Quick Trigger */}
-        <button
-          onClick={() => {
-            setIsTelegramLinkModalOpen(true);
-            onClose?.();
-          }}
-          className="w-full mb-2 py-2.5 px-3.5 rounded-2xl bg-blue-50/80 dark:bg-sky-950/30 hover:bg-blue-100 dark:hover:bg-sky-900/40 text-blue-600 dark:text-sky-400 font-bold text-xs border border-blue-200/70 dark:border-sky-800/50 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
-        >
-          <Link2 className="w-4 h-4" />
-          <span>{t('telegramLinkInspector')}</span>
-        </button>
+        {/* Workspace Quick Triggers */}
+        <div className="grid grid-cols-1 gap-1.5 mb-4 pb-3.5 border-b border-slate-100 dark:border-white/[0.06]">
+          <button
+            onClick={() => {
+              setIsChatSelectorOpen(true);
+              onClose?.();
+            }}
+            className="w-full h-9.5 px-3 rounded-xl bg-[#F4F6FA] dark:bg-[#171B26] hover:bg-slate-200/70 dark:hover:bg-white/[0.08] border border-slate-200/60 dark:border-white/[0.05] text-slate-700 dark:text-slate-200 font-semibold text-xs flex items-center justify-between transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <MessageSquare className="w-4 h-4 text-blue-600 dark:text-sky-400 shrink-0" />
+              <span className="truncate">
+                {activeChatTitle || (lang === 'fa' ? 'پیام‌های ذخیره‌شده' : 'Saved Messages')}
+              </span>
+            </div>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          </button>
 
+          <button
+            onClick={() => {
+              setIsTelegramLinkModalOpen(true);
+              onClose?.();
+            }}
+            className="w-full h-9.5 px-3 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.05] hover:text-blue-600 dark:hover:text-sky-400 font-semibold text-xs flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <Link2 className="w-4 h-4 text-blue-600 dark:text-sky-400 shrink-0" />
+            <span className="truncate">{t('telegramLinkInspector')}</span>
+          </button>
+        </div>
 
-
-
-        {/* Favorites Navigation Item */}
+        {/* Favorites Navigation */}
         <button
           onClick={() => {
             setActiveTab('favorites');
+            setActiveFolderId(null);
             setSelectedCategory('all');
             setSelectedExtension(null);
             onClose?.();
           }}
-          className={`w-full mb-3 flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer active:scale-[0.99] ${
+          className={`w-full mb-4 flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all duration-150 cursor-pointer ${
             activeTab === 'favorites'
-              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold shadow-2xs'
-              : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/60 hover:text-amber-600 dark:hover:text-amber-400'
+              ? 'bg-amber-500/12 text-amber-700 dark:text-amber-300'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-white/[0.04] hover:text-slate-900 dark:hover:text-slate-200'
           }`}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <Star
               className={`w-4 h-4 shrink-0 text-amber-500 ${
                 activeTab === 'favorites' ? 'fill-amber-500' : ''
@@ -475,25 +419,17 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
             <span className="truncate">{t('favorites')}</span>
           </div>
           {favoriteFileIds.length > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400">
+            <span className="text-[11px] font-mono tabular-nums text-amber-600 dark:text-amber-400 font-bold">
               {favoriteFileIds.length}
             </span>
           )}
         </button>
 
-        {/* ================================================================= */}
-        {/* Custom User Folders Section                                       */}
-        {/* ================================================================= */}
+        {/* Custom User Folders */}
         <div className="mb-4">
-          <div className="flex items-center justify-between px-2 mb-2">
-            <span className="text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
-              <Folder className="w-3.5 h-3.5 text-blue-500" />
-              <span>{t('myFolders')}</span>
-              {folders.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-md bg-blue-500/10 text-blue-600 dark:text-sky-400 font-mono text-[10px]">
-                  {folders.length}
-                </span>
-              )}
+          <div className="flex items-center justify-between px-2 mb-1.5">
+            <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+              {t('myFolders')}
             </span>
 
             <button
@@ -501,7 +437,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                 setFolderToEdit(null);
                 setIsFolderModalOpen(true);
               }}
-              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 dark:text-sky-400 hover:text-blue-700 dark:hover:text-sky-300 px-1.5 py-0.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-sky-400 hover:text-blue-700 dark:hover:text-sky-300 px-1.5 py-0.5 rounded-lg hover:bg-blue-50 dark:hover:bg-sky-500/10 transition cursor-pointer"
               title={t('createFolder')}
             >
               <Plus className="w-3.5 h-3.5" />
@@ -510,25 +446,28 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
           </div>
 
           {folders.length === 0 ? (
-            <div
+            <button
+              type="button"
               onClick={() => {
                 setFolderToEdit(null);
                 setIsFolderModalOpen(true);
               }}
-              className="p-2.5 rounded-2xl border border-dashed border-slate-200 dark:border-zinc-800 hover:border-blue-400 dark:hover:border-sky-500 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all cursor-pointer text-center group"
+              className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-200 dark:border-white/[0.08] hover:border-blue-400 dark:hover:border-sky-500/50 hover:bg-blue-50/40 dark:hover:bg-sky-500/5 transition-all cursor-pointer flex items-center gap-2.5 text-start"
             >
-              <div className="w-7 h-7 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center mx-auto mb-1 group-hover:scale-110 transition-transform">
+              <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-sky-400 flex items-center justify-center shrink-0">
                 <Plus className="w-3.5 h-3.5" />
               </div>
-              <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 block">
-                {t('createFolder')}
-              </span>
-              <span className="text-[10px] text-slate-400 dark:text-zinc-500">
-                {lang === 'fa' ? 'دسته‌بندی فایل‌ها در پوشه دلخواه' : 'Organize files into folders'}
-              </span>
-            </div>
+              <div className="min-w-0">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block truncate">
+                  {t('createFolder')}
+                </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 block truncate">
+                  {lang === 'fa' ? 'سازماندهی فایل‌ها' : 'Organize files'}
+                </span>
+              </div>
+            </button>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {folders.map((folder) => {
                 const colorConfig = getFolderColor(folder.color);
                 const FolderIcon = getFolderIcon(folder.icon);
@@ -544,29 +483,23 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                       setSelectedExtension(null);
                       onClose?.();
                     }}
-                    className={`group/folder w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer active:scale-[0.99] ${
+                    className={`group/folder w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all duration-150 cursor-pointer ${
                       isActive
-                        ? `${colorConfig.bgClass} ${colorConfig.textClass} font-bold shadow-2xs border ${colorConfig.borderClass}`
-                        : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/60 hover:text-slate-900 dark:hover:text-zinc-200 border border-transparent'
+                        ? `${colorConfig.bgClass} ${colorConfig.textClass}`
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-white/[0.04] hover:text-slate-900 dark:hover:text-slate-200'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <FolderIcon
                         className={`w-4 h-4 shrink-0 ${
-                          isActive ? colorConfig.textClass : 'opacity-70 group-hover/folder:opacity-100'
+                          isActive ? colorConfig.textClass : 'opacity-75 group-hover/folder:opacity-100'
                         }`}
                       />
                       <span className="truncate">{folder.name}</span>
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono tabular-nums font-bold ${
-                          isActive
-                            ? 'bg-white/80 dark:bg-zinc-800/80'
-                            : 'bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400'
-                        }`}
-                      >
+                      <span className="text-[11px] font-mono tabular-nums text-slate-400 dark:text-slate-500">
                         {folder.files.length}
                       </span>
 
@@ -577,7 +510,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                           setFolderToEdit(folder);
                           setIsFolderModalOpen(true);
                         }}
-                        className="opacity-0 group-hover/folder:opacity-100 p-1 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 transition"
+                        className="opacity-0 group-hover/folder:opacity-100 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition"
                         title={t('editFolder')}
                       >
                         <Settings2 className="w-3.5 h-3.5" />
@@ -590,27 +523,26 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
           )}
         </div>
 
-        {/* Section Label */}
-        <div className="px-2 mb-2 text-[11px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider">
-          {lang === 'fa' ? 'دسته‌بندی فایل‌ها' : 'Storage Categories'}
+        {/* Storage Categories */}
+        <div className="px-2 mb-1.5 text-[11px] font-semibold text-slate-400 dark:text-slate-500">
+          {lang === 'fa' ? 'دسته‌بندی فایل‌ها' : 'Categories'}
         </div>
 
-        {/* Navigation Categories */}
-        <nav className="space-y-1">
+        <nav className="space-y-0.5">
           {categories.map((cat) => {
             const Icon = cat.icon;
-            const isActive = activeTab === 'files' && selectedCategory === cat.id;
+            const isActive = activeTab === 'files' && !activeFolderId && selectedCategory === cat.id;
             return (
               <button
                 key={cat.id}
                 onClick={() => handleSelectCategory(cat.id)}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer active:scale-[0.99] ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all duration-150 cursor-pointer ${
                   isActive
-                    ? 'bg-blue-600/10 dark:bg-sky-500/15 text-blue-600 dark:text-sky-400 font-bold shadow-2xs'
-                    : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800/60 hover:text-slate-900 dark:hover:text-zinc-200'
+                    ? 'bg-blue-600/10 dark:bg-sky-500/15 text-blue-600 dark:text-sky-400'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-white/[0.04] hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
                   <Icon
                     className={`w-4 h-4 shrink-0 ${
                       isActive ? 'text-blue-600 dark:text-sky-400' : 'opacity-70'
@@ -620,10 +552,10 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                 </div>
                 {cat.count !== undefined && cat.count > 0 && (
                   <span
-                    className={`text-[11px] px-2 py-0.5 rounded-lg font-mono tabular-nums font-bold ${
+                    className={`text-[11px] font-mono tabular-nums ${
                       isActive
-                        ? 'bg-blue-600/20 text-blue-700 dark:text-sky-300'
-                        : 'bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400'
+                        ? 'text-blue-600 dark:text-sky-400 font-bold'
+                        : 'text-slate-400 dark:text-slate-500'
                     }`}
                   >
                     {cat.count}
@@ -635,26 +567,26 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
         </nav>
       </div>
 
-      {/* Bottom Area: Storage Metrics & User Card */}
-      <div className="mt-4 pt-3 border-t border-slate-100 dark:border-zinc-800/80 space-y-3">
-        {/* Mobile Language & Theme Switcher in drawer */}
+      {/* Bottom Area: Storage Metrics */}
+      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-white/[0.06] space-y-2.5">
+        {/* Mobile Language & Theme Switcher */}
         <div className="flex items-center gap-2 md:hidden">
           <button
             onClick={() => setLang(lang === 'fa' ? 'en' : 'fa')}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 dark:bg-zinc-800 text-xs font-bold text-slate-700 dark:text-zinc-200 active:scale-95"
+            className="flex-1 flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl bg-[#F4F6FA] dark:bg-[#171B26] text-xs font-semibold text-slate-700 dark:text-slate-200 active:scale-95 cursor-pointer"
           >
             <Globe className="w-3.5 h-3.5 text-blue-500" />
             <span>{lang === 'fa' ? 'English' : 'فارسی'}</span>
           </button>
           <button
             onClick={(e) => toggleTheme(e)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 dark:bg-zinc-800 text-xs font-bold text-slate-700 dark:text-zinc-200 active:scale-95 transition-all group/sideTheme cursor-pointer overflow-hidden"
+            className="flex-1 flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl bg-[#F4F6FA] dark:bg-[#171B26] text-xs font-semibold text-slate-700 dark:text-slate-200 active:scale-95 transition-all cursor-pointer overflow-hidden"
           >
             <div className="relative w-3.5 h-3.5 flex items-center justify-center shrink-0">
               {isDark ? (
-                <Sun className="w-3.5 h-3.5 text-amber-400 theme-icon-spring theme-icon-sun animate-in zoom-in-50 spin-in-180 duration-500" />
+                <Sun className="w-3.5 h-3.5 text-amber-400 theme-icon-spring theme-icon-sun" />
               ) : (
-                <Moon className="w-3.5 h-3.5 text-slate-700 dark:text-zinc-300 theme-icon-spring theme-icon-moon animate-in zoom-in-50 spin-in-[-180deg] duration-500" />
+                <Moon className="w-3.5 h-3.5 text-slate-600 theme-icon-spring theme-icon-moon" />
               )}
             </div>
             <span>{isDark ? t('lightMode') : t('darkMode')}</span>
@@ -671,42 +603,61 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                 install();
               }
             }}
-            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-blue-50/90 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/60 text-blue-600 dark:text-sky-400 text-xs font-bold transition active:scale-98 cursor-pointer"
+            className="w-full flex items-center justify-between p-2.5 rounded-xl bg-blue-50 dark:bg-sky-500/10 text-blue-600 dark:text-sky-400 text-xs font-semibold transition active:scale-[0.98] cursor-pointer md:hidden"
           >
             <span className="flex items-center gap-2">
               <Download className="w-4 h-4" />
-              <span>{lang === 'fa' ? 'نصب اپلیکیشن مستقل' : 'Install TeleCloud App'}</span>
+              <span>{lang === 'fa' ? 'نصب اپلیکیشن' : 'Install App'}</span>
             </span>
-            <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">
-              {lang === 'fa' ? 'نصب' : 'Install'}
+            <span className="text-[11px] font-bold">
+              {lang === 'fa' ? 'نصب' : 'Get'}
             </span>
           </button>
         )}
 
-        {/* Storage Card */}
-        <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-zinc-900/90 border border-slate-200/80 dark:border-zinc-800/80 shadow-2xs">
+        {/* Storage Quota Summary */}
+        <div className="p-3 rounded-2xl bg-[#F4F6FA] dark:bg-[#171B26] border border-slate-200/75 dark:border-white/[0.06]">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
-              <HardDrive className="w-3.5 h-3.5 text-blue-500" />
-              {t('storageUsed')}
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <HardDrive className="w-3.5 h-3.5 text-blue-600 dark:text-sky-400" />
+              <span>{t('storageUsed')}</span>
             </span>
-            <span className="text-xs font-black text-blue-600 dark:text-sky-400 font-mono tabular-nums">
-              {formatFileSize(stats?.totalSize || 0)}
+            <span className="text-xs font-bold text-slate-900 dark:text-slate-100 font-mono tabular-nums" dir="ltr">
+              {formatFileSize(totalBytes)}
             </span>
           </div>
 
-          <div className="w-full h-2 bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden flex">
-            <div style={{ width: '45%' }} className="h-full bg-blue-500" title="Videos" />
-            <div style={{ width: '25%' }} className="h-full bg-emerald-500" title="Images" />
-            <div style={{ width: '15%' }} className="h-full bg-amber-500" title="Audio" />
-            <div style={{ width: '15%' }} className="h-full bg-purple-500" title="Docs" />
+          <div className="w-full h-1.5 bg-slate-200 dark:bg-white/[0.08] rounded-full overflow-hidden flex gap-0.5">
+            {storageSegments.length > 0 ? (
+              storageSegments.map((seg) => (
+                <div
+                  key={seg.key}
+                  style={{ width: `${Math.max(4, (seg.size / totalBytes) * 100)}%` }}
+                  className={`h-full ${seg.color} first:rounded-s-full last:rounded-e-full transition-all duration-300`}
+                  title={`${seg.label}: ${formatFileSize(seg.size)}`}
+                />
+              ))
+            ) : (
+              <div className="h-full w-0 bg-blue-500" />
+            )}
           </div>
 
-          <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-zinc-500 mt-1.5 font-mono">
+          {storageSegments.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-2 text-[10px] text-slate-500 dark:text-slate-400">
+              {storageSegments.slice(0, 4).map((seg) => (
+                <span key={seg.key} className="inline-flex items-center gap-1">
+                  <span className={`w-1.5 h-1.5 rounded-full ${seg.color}`} />
+                  <span>{seg.label}</span>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 mt-2 pt-2 border-t border-slate-200/60 dark:border-white/[0.05] font-mono tabular-nums">
             <span>
-              {stats?.totalFiles || 0} {lang === 'fa' ? 'فایل ابری' : 'cloud files'}
+              {stats?.totalFiles || 0} {lang === 'fa' ? 'فایل' : 'files'}
             </span>
-            <span className="text-emerald-500 font-semibold">
+            <span className="text-emerald-600 dark:text-emerald-400 font-sans font-semibold">
               {lang === 'fa' ? 'نامحدود' : 'Unlimited'}
             </span>
           </div>
@@ -715,4 +666,3 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
     </aside>
   );
 }
-

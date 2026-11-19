@@ -830,7 +830,7 @@ export function VideoPlayerModal({
             triggerPipControls();
           }
         }}
-        className={`fixed z-50 aspect-16/10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.7)] border border-white/25 bg-zinc-950/85 backdrop-blur-2xl backdrop-saturate-150 group/pip select-none flex flex-col justify-between ring-1 ring-white/10 pip-smooth-container ${
+        className={`fixed z-50 aspect-16/10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.7)] border border-white/20 bg-[#11141C]/90 backdrop-blur-2xl group/pip select-none flex flex-col justify-between ring-1 ring-white/10 pip-smooth-container ${
           isPipInteracting ? 'ring-2 ring-sky-400 shadow-2xl' : 'cursor-default'
         }`}
       >
@@ -906,7 +906,7 @@ export function VideoPlayerModal({
           <div className="flex items-center gap-1.5 min-w-0 flex-1 pointer-events-none">
             <GripHorizontal className="w-3.5 h-3.5 text-white/50 shrink-0" />
             <Film className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span className="text-xs font-bold truncate text-zinc-100">{file.filename}</span>
+            <span className="text-xs font-bold truncate text-slate-100" dir="auto">{file.filename}</span>
           </div>
 
           <div className="flex items-center gap-1 shrink-0 pointer-events-auto">
@@ -1055,7 +1055,7 @@ export function VideoPlayerModal({
                   togglePlay();
                   triggerPipControls();
                 }}
-                className="w-9 h-9 rounded-full bg-white text-zinc-950 hover:bg-sky-400 hover:text-white flex items-center justify-center transition shadow-xl active:scale-95 cursor-pointer"
+                className="w-9 h-9 rounded-full bg-white text-[#090B10] hover:bg-sky-400 hover:text-white flex items-center justify-center transition shadow-xl active:scale-95 cursor-pointer"
               >
                 {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
               </button>
@@ -1090,7 +1090,7 @@ export function VideoPlayerModal({
               style={{ width: `${progressPercent}%` }}
             />
           </div>
-          <div className="flex items-center justify-between text-[9px] text-zinc-300 font-mono px-0.5">
+          <div className="flex items-center justify-between text-[9px] text-slate-300 font-mono tabular-nums px-0.5">
             <span>{formatDuration(currentTime)}</span>
             <span>{formatDuration(effectiveDuration)}</span>
           </div>
@@ -1197,7 +1197,7 @@ export function VideoPlayerModal({
               handlePrevVideo();
               resetControlsTimeout();
             }}
-            className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-zinc-950/60 hover:bg-zinc-900/80 text-white backdrop-blur-2xl border border-white/15 items-center justify-center transition shadow-2xl hover:scale-110 active:scale-95 ring-1 ring-white/10"
+            className="hidden sm:flex absolute left-4 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-[#11141C]/80 hover:bg-[#171B26] text-white backdrop-blur-2xl border border-white/15 items-center justify-center transition shadow-2xl hover:scale-105 active:scale-95 cursor-pointer"
             title={lang === 'fa' ? 'ویدیوی قبلی' : 'Previous Video'}
           >
             <ChevronLeft className="w-6 h-6" />
@@ -1212,7 +1212,7 @@ export function VideoPlayerModal({
               handleNextVideo();
               resetControlsTimeout();
             }}
-            className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-zinc-950/60 hover:bg-zinc-900/80 text-white backdrop-blur-2xl border border-white/15 items-center justify-center transition shadow-2xl hover:scale-110 active:scale-95 ring-1 ring-white/10"
+            className="hidden sm:flex absolute right-4 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-[#11141C]/80 hover:bg-[#171B26] text-white backdrop-blur-2xl border border-white/15 items-center justify-center transition shadow-2xl hover:scale-105 active:scale-95 cursor-pointer"
             title={lang === 'fa' ? 'ویدیوی بعدی' : 'Next Video'}
           >
             <ChevronRight className="w-6 h-6" />
@@ -1335,7 +1335,7 @@ export function VideoPlayerModal({
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm z-30 pointer-events-none gap-3 animate-in fade-in duration-150">
             <div className="relative">
               <div className="w-14 h-14 rounded-full border-4 border-sky-500/20 border-t-sky-400 animate-spin" />
-              <Zap className="w-6 h-6 text-sky-400 absolute inset-0 m-auto animate-pulse" />
+              <Zap className="w-6 h-6 text-sky-400 absolute inset-0 m-auto" />
             </div>
             <div className="text-center px-4">
               <p className="text-sm font-bold text-white tracking-wide">
@@ -1346,7 +1346,7 @@ export function VideoPlayerModal({
         )}
       </div>
 
-      {/* ----------------- Top Header Bar (Glassmorphic) ----------------- */}
+      {/* ----------------- Top Header Bar ----------------- */}
       <div 
         className={`absolute top-0 inset-x-0 p-3 sm:p-5 pt-[max(0.75rem,env(safe-area-inset-top))] bg-gradient-to-b from-black/85 via-black/40 to-transparent backdrop-blur-[2px] flex items-center justify-between gap-2 text-white z-40 transition-all duration-300 ${
           showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
@@ -1357,28 +1357,26 @@ export function VideoPlayerModal({
         }}
       >
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500/20 to-orange-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/30 shadow-inner backdrop-blur-md">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/25 backdrop-blur-md">
             <Film className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <h3 className="text-xs sm:text-sm font-bold truncate max-w-[150px] xs:max-w-[210px] sm:max-w-md md:max-w-xl text-zinc-100">{file.filename}</h3>
-              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-white/10 text-zinc-300 border border-white/10 shrink-0 backdrop-blur-md">
-                {ext || 'VIDEO'}
-              </span>
+              <h3 className="text-xs sm:text-sm font-bold truncate max-w-[150px] xs:max-w-[210px] sm:max-w-md md:max-w-xl text-slate-100" dir="auto">{file.filename}</h3>
               {videoFiles.length > 1 && (
-                <span className="text-[9px] sm:text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-white/10 text-zinc-300 shrink-0 backdrop-blur-md">
-                  {currentIndex + 1} / {videoFiles.length}
+                <span className="text-[11px] font-mono tabular-nums text-slate-300 shrink-0" dir="ltr">
+                  · {currentIndex + 1} / {videoFiles.length}
                 </span>
               )}
             </div>
-            <p className="text-[10px] sm:text-xs text-zinc-400 font-mono mt-0.5 flex items-center gap-1.5 sm:gap-2 truncate">
-              <span>{formatFileSize(file.size)}</span>
-              {Boolean(file.width && file.height) && <span className="hidden xs:inline">• {file.width}×{file.height}</span>}
-              {effectiveDuration > 0 && <span>• {formatDuration(effectiveDuration)}</span>}
+            <p className="text-[10px] sm:text-xs text-slate-400 font-mono tabular-nums mt-0.5 flex items-center gap-1.5 sm:gap-2 truncate">
+              <span className="uppercase">{ext || 'VIDEO'}</span>
+              <span>· {formatFileSize(file.size)}</span>
+              {Boolean(file.width && file.height) && <span className="hidden xs:inline">· {file.width}×{file.height}</span>}
+              {effectiveDuration > 0 && <span>· {formatDuration(effectiveDuration)}</span>}
               {playbackMode === 'transcode' && (
-                <span className="text-sky-400 flex items-center gap-1 font-sans font-medium text-[10px] bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20 shrink-0">
-                  <Zap className="w-2.5 h-2.5" /> Live
+                <span className="text-sky-400 flex items-center gap-1 font-sans font-semibold text-[11px] shrink-0">
+                  · <Zap className="w-3 h-3" /> Live
                 </span>
               )}
             </p>
@@ -1390,7 +1388,7 @@ export function VideoPlayerModal({
           <button
             onClick={takeSnapshot}
             title="عکس از فریم ویدیو (Snapshot)"
-            className="p-2 sm:p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white transition backdrop-blur-md relative hidden xs:flex border border-white/10"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#11141C]/75 hover:bg-[#171B26] text-slate-200 hover:text-white transition backdrop-blur-md relative hidden xs:flex items-center justify-center border border-white/15 cursor-pointer"
           >
             {snapshotSuccess ? <Check className="w-4 h-4 text-emerald-400" /> : <Camera className="w-4 h-4" />}
           </button>
@@ -1398,7 +1396,7 @@ export function VideoPlayerModal({
           <button
             onClick={handleCopyLink}
             title={t('copyDirectLink')}
-            className="p-2 sm:p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white transition backdrop-blur-md border border-white/10"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#11141C]/75 hover:bg-[#171B26] text-slate-200 hover:text-white flex items-center justify-center transition backdrop-blur-md border border-white/15 cursor-pointer"
           >
             {isCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
           </button>
@@ -1407,7 +1405,7 @@ export function VideoPlayerModal({
             href={file.downloadUrl}
             download={file.filename}
             title={t('directDownload')}
-            className="p-2 sm:p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white transition backdrop-blur-md border border-white/10"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#11141C]/75 hover:bg-[#171B26] text-slate-200 hover:text-white flex items-center justify-center transition backdrop-blur-md border border-white/15"
           >
             <Download className="w-4 h-4" />
           </a>
@@ -1417,10 +1415,10 @@ export function VideoPlayerModal({
             <button
               onClick={toggleNativeOSPiP}
               title={lang === 'fa' ? 'شناور خارج از مرورگر (OS Picture-in-Picture)' : 'Pop out to OS Floating Window'}
-              className={`p-2 sm:p-2.5 rounded-full transition backdrop-blur-md active:scale-95 cursor-pointer border ${
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition backdrop-blur-md active:scale-95 cursor-pointer border ${
                 isNativePiPActive
                   ? 'bg-sky-500 text-white border-sky-400 shadow-md shadow-sky-500/30'
-                  : 'bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white border-white/10'
+                  : 'bg-[#11141C]/75 hover:bg-[#171B26] text-slate-200 hover:text-white border-white/15'
               }`}
             >
               <PictureInPicture className="w-4 h-4" />
@@ -1431,21 +1429,22 @@ export function VideoPlayerModal({
           <button
             onClick={togglePiP}
             title={lang === 'fa' ? 'تصویر در تصویر شناور درون برنامه (In-App PiP)' : 'In-App Draggable Mini Player'}
-            className="p-2 sm:p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white transition backdrop-blur-md active:scale-95 cursor-pointer border border-white/10"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#11141C]/75 hover:bg-[#171B26] text-slate-200 hover:text-white flex items-center justify-center transition backdrop-blur-md active:scale-95 cursor-pointer border border-white/15"
           >
             <PictureInPicture2 className="w-4 h-4" />
           </button>
 
           <button
             onClick={onClose}
-            className="p-2 sm:p-2.5 rounded-full bg-white/10 hover:bg-rose-600 text-zinc-300 hover:text-white transition backdrop-blur-md border border-white/10"
+            aria-label="Close"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#11141C]/75 hover:bg-rose-600 text-slate-200 hover:text-white flex items-center justify-center transition backdrop-blur-md border border-white/15 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* ----------------- Bottom Floating Controls Panel (Glassmorphic) ----------------- */}
+      {/* ----------------- Bottom Floating Controls Panel ----------------- */}
       <div 
         className={`absolute bottom-0 inset-x-0 p-2.5 sm:p-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-40 transition-all duration-300 ${
           showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
@@ -1455,7 +1454,7 @@ export function VideoPlayerModal({
           resetControlsTimeout();
         }}
       >
-        <div className="bg-zinc-950/65 dark:bg-zinc-950/70 backdrop-blur-2xl backdrop-saturate-150 border border-white/15 rounded-2xl sm:rounded-3xl p-2.5 sm:px-5 sm:py-3.5 shadow-[0_16px_50px_rgba(0,0,0,0.6)] ring-1 ring-white/10 flex flex-col gap-2 max-w-5xl mx-auto">
+        <div className="bg-[#11141C]/90 backdrop-blur-2xl border border-white/15 rounded-2xl sm:rounded-3xl p-2.5 sm:px-5 sm:py-3.5 shadow-2xl flex flex-col gap-2 max-w-5xl mx-auto">
           
           {/* Progress Bar */}
           <div 
@@ -1486,7 +1485,7 @@ export function VideoPlayerModal({
 
             {hoverTime !== null && (
               <div 
-                className="absolute -top-8 -translate-x-1/2 px-2 py-0.5 rounded-md bg-zinc-900 border border-white/20 text-white font-mono text-[11px] pointer-events-none shadow-xl"
+                className="absolute -top-8 -translate-x-1/2 px-2 py-0.5 rounded-md bg-[#171B26] border border-white/15 text-white font-mono tabular-nums text-[11px] pointer-events-none shadow-xl"
                 style={{ left: `${hoverPosition}px` }}
               >
                 {formatDuration(hoverTime)}
@@ -1499,7 +1498,7 @@ export function VideoPlayerModal({
             <div className="flex items-center gap-1 sm:gap-2.5 min-w-0">
               <button
                 onClick={togglePlay}
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white text-zinc-950 hover:bg-sky-400 hover:text-white transition flex items-center justify-center shadow-lg active:scale-95 shrink-0"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white text-[#090B10] hover:bg-sky-400 hover:text-white transition flex items-center justify-center shadow-lg active:scale-95 shrink-0 cursor-pointer"
               >
                 {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
               </button>
@@ -1507,7 +1506,7 @@ export function VideoPlayerModal({
               <button
                 onClick={() => skipTime(-10)}
                 title="۱۰ ثانیه به عقب"
-                className="p-1.5 sm:p-2 rounded-xl text-zinc-300 hover:text-white hover:bg-white/10 transition flex items-center justify-center shrink-0"
+                className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition flex items-center justify-center shrink-0 cursor-pointer"
               >
                 <RotateCcw className="w-4 h-4" />
               </button>
@@ -1515,7 +1514,7 @@ export function VideoPlayerModal({
               <button
                 onClick={() => skipTime(10)}
                 title="۱۰ ثانیه به جلو"
-                className="p-1.5 sm:p-2 rounded-xl text-zinc-300 hover:text-white hover:bg-white/10 transition flex items-center justify-center shrink-0"
+                className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition flex items-center justify-center shrink-0 cursor-pointer"
               >
                 <RotateCw className="w-4 h-4" />
               </button>
@@ -1523,7 +1522,7 @@ export function VideoPlayerModal({
               <div className="flex items-center gap-1.5 group/vol relative shrink-0">
                 <button
                   onClick={toggleMute}
-                  className="p-1.5 sm:p-2 rounded-xl text-zinc-300 hover:text-white hover:bg-white/10 transition"
+                  className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
                   title="صدا"
                 >
                   {isMuted || volume === 0 ? (
@@ -1550,11 +1549,11 @@ export function VideoPlayerModal({
               <button
                 onClick={() => setShowRemainingTime(!showRemainingTime)}
                 title="تغییر حالت نمایش زمان باقی‌مانده"
-                className="text-[10px] xs:text-[11px] sm:text-xs font-mono text-zinc-300 hover:text-white px-1 sm:px-2 py-1 rounded-lg hover:bg-white/10 transition select-none flex items-center gap-1 truncate"
+                className="text-[10px] xs:text-[11px] sm:text-xs font-mono tabular-nums text-slate-300 hover:text-white px-1 sm:px-2 py-1 rounded-lg hover:bg-white/10 transition select-none flex items-center gap-1 truncate cursor-pointer"
               >
                 <span>{formatDuration(currentTime)}</span>
-                <span className="text-zinc-500">/</span>
-                <span className="text-zinc-400 font-medium">
+                <span className="text-slate-500">/</span>
+                <span className="text-slate-400 font-medium">
                   {showRemainingTime && effectiveDuration > 0
                     ? `-${formatDuration(Math.max(0, effectiveDuration - currentTime))}`
                     : formatDuration(effectiveDuration)}
@@ -1569,10 +1568,10 @@ export function VideoPlayerModal({
                     setShowQualityMenu(!showQualityMenu);
                     setShowSpeedMenu(false);
                   }}
-                  className={`flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-medium border transition ${
+                  className={`flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-medium border transition cursor-pointer ${
                     playbackMode === 'transcode' 
-                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/40 hover:bg-sky-500/30' 
-                      : 'bg-white/10 text-zinc-300 border-white/10 hover:bg-white/20'
+                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/35 hover:bg-sky-500/30' 
+                      : 'bg-[#171B26] text-slate-200 border-white/10 hover:bg-[#232938]'
                   }`}
                   title="کیفیت و موتور پخش"
                 >
@@ -1581,8 +1580,8 @@ export function VideoPlayerModal({
                 </button>
 
                 {showQualityMenu && (
-                  <div className="absolute bottom-full end-0 mb-3 w-56 rounded-2xl bg-zinc-950/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/20 p-2 shadow-[0_12px_40px_rgba(0,0,0,0.6)] z-50 text-xs flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150 ring-1 ring-white/10">
-                    <div className="px-3 py-1 text-[11px] font-bold text-zinc-400 border-b border-white/10 flex items-center justify-between">
+                  <div className="absolute bottom-full end-0 mb-3 w-56 rounded-2xl bg-[#11141C]/95 backdrop-blur-2xl border border-white/15 p-2 shadow-2xl z-50 text-xs flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-3 py-1.5 text-[11px] font-bold text-slate-400 border-b border-white/[0.08] flex items-center justify-between">
                       <span>موتور پخش و کیفیت</span>
                       <Zap className="w-3 h-3 text-amber-400" />
                     </div>
@@ -1595,13 +1594,13 @@ export function VideoPlayerModal({
                         setIsTranscodingLoading(true);
                         setRetryAttempt(r => r + 1);
                       }}
-                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-right transition ${
-                        playbackMode === 'transcode' && quality === 'auto' ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30' : 'hover:bg-white/10 text-zinc-300'
+                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-right transition cursor-pointer ${
+                        playbackMode === 'transcode' && quality === 'auto' ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30' : 'hover:bg-[#171B26] text-slate-300'
                       }`}
                     >
                       <div className="flex flex-col">
                         <span className="font-semibold">تبدیل خودکار (Auto fMP4)</span>
-                        <span className="text-[10px] text-zinc-400">مناسب تمام فرمت‌ها و MKV</span>
+                        <span className="text-[10px] text-slate-400">مناسب تمام فرمت‌ها و MKV</span>
                       </div>
                       {playbackMode === 'transcode' && quality === 'auto' && <CheckCircle2 className="w-4 h-4 text-sky-400" />}
                     </button>
@@ -1614,8 +1613,8 @@ export function VideoPlayerModal({
                         setIsTranscodingLoading(true);
                         setRetryAttempt(r => r + 1);
                       }}
-                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-right transition ${
-                        playbackMode === 'transcode' && quality === '1080p' ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30' : 'hover:bg-white/10 text-zinc-300'
+                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-right transition cursor-pointer ${
+                        playbackMode === 'transcode' && quality === '1080p' ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30' : 'hover:bg-[#171B26] text-slate-300'
                       }`}
                     >
                       <span>1080p Full HD</span>
@@ -1630,8 +1629,8 @@ export function VideoPlayerModal({
                         setIsTranscodingLoading(true);
                         setRetryAttempt(r => r + 1);
                       }}
-                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-right transition ${
-                        playbackMode === 'transcode' && quality === '720p' ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30' : 'hover:bg-white/10 text-zinc-300'
+                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-right transition cursor-pointer ${
+                        playbackMode === 'transcode' && quality === '720p' ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30' : 'hover:bg-[#171B26] text-slate-300'
                       }`}
                     >
                       <span>720p HD</span>
@@ -1644,13 +1643,13 @@ export function VideoPlayerModal({
                         setShowQualityMenu(false);
                         setIsTranscodingLoading(false);
                       }}
-                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-right border-t border-white/10 mt-1 transition ${
-                        playbackMode === 'direct' ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30' : 'hover:bg-white/10 text-zinc-300'
+                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-right border-t border-white/[0.08] mt-1 transition cursor-pointer ${
+                        playbackMode === 'direct' ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30' : 'hover:bg-[#171B26] text-slate-300'
                       }`}
                     >
                       <div className="flex flex-col">
                         <span className="font-semibold">استریم خام تلگرام (Direct)</span>
-                        <span className="text-[10px] text-zinc-400">فرمت‌های استاندارد MP4/WebM</span>
+                        <span className="text-[10px] text-slate-400">فرمت‌های استاندارد MP4/WebM</span>
                       </div>
                       {playbackMode === 'direct' && <CheckCircle2 className="w-4 h-4 text-sky-400" />}
                     </button>
@@ -1664,20 +1663,20 @@ export function VideoPlayerModal({
                     setShowSpeedMenu(!showSpeedMenu);
                     setShowQualityMenu(false);
                   }}
-                  className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-zinc-300 hover:text-white text-[11px] sm:text-xs font-mono border border-white/10 transition backdrop-blur-md"
+                  className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-[#171B26] hover:bg-[#232938] text-slate-200 hover:text-white text-[11px] sm:text-xs font-mono tabular-nums border border-white/10 transition cursor-pointer"
                   title="سرعت پخش"
                 >
                   {playbackRate}x
                 </button>
 
                 {showSpeedMenu && (
-                  <div className="absolute bottom-full end-0 mb-3 w-28 rounded-2xl bg-zinc-950/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/20 p-1.5 shadow-[0_12px_40px_rgba(0,0,0,0.6)] z-50 text-xs flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150 ring-1 ring-white/10">
+                  <div className="absolute bottom-full end-0 mb-3 w-28 rounded-2xl bg-[#11141C]/95 backdrop-blur-2xl border border-white/15 p-1.5 shadow-2xl z-50 text-xs flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150">
                     {[0.5, 0.75, 1, 1.25, 1.5, 2].map((s) => (
                       <button
                         key={s}
                         onClick={() => changeSpeed(s)}
-                        className={`px-3 py-1.5 rounded-xl text-center font-mono transition ${
-                          playbackRate === s ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30' : 'hover:bg-white/10 text-zinc-300'
+                        className={`px-3 py-1.5 rounded-xl text-center font-mono tabular-nums transition cursor-pointer ${
+                          playbackRate === s ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/30' : 'hover:bg-[#171B26] text-slate-300'
                         }`}
                       >
                         {s}x
@@ -1692,10 +1691,10 @@ export function VideoPlayerModal({
                 <button
                   onClick={toggleNativeOSPiP}
                   title={lang === 'fa' ? 'شناور خارج از مرورگر (OS Picture-in-Picture)' : 'Pop out to OS Floating Window'}
-                  className={`p-2 rounded-xl transition hidden sm:flex ${
+                  className={`p-2 rounded-xl transition hidden sm:flex cursor-pointer ${
                     isNativePiPActive
                       ? 'bg-sky-500 text-white shadow-md shadow-sky-500/30'
-                      : 'text-zinc-300 hover:text-white hover:bg-white/10'
+                      : 'text-slate-300 hover:text-white hover:bg-white/10'
                   }`}
                 >
                   <PictureInPicture className="w-4 h-4" />
@@ -1706,7 +1705,7 @@ export function VideoPlayerModal({
               <button
                 onClick={togglePiP}
                 title={lang === 'fa' ? 'تصویر در تصویر شناور درون برنامه (In-App PiP)' : 'In-App Draggable Mini Player'}
-                className="p-2 rounded-xl text-zinc-300 hover:text-white hover:bg-white/10 transition hidden sm:flex"
+                className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition hidden sm:flex cursor-pointer"
               >
                 <PictureInPicture2 className="w-4 h-4" />
               </button>
@@ -1714,7 +1713,7 @@ export function VideoPlayerModal({
               <button
                 onClick={toggleFullscreen}
                 title={isFullscreen ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'}
-                className="p-1.5 sm:p-2 rounded-xl text-zinc-300 hover:text-white hover:bg-white/10 transition"
+                className="p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
               >
                 {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
               </button>
