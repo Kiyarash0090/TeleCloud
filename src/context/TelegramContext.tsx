@@ -303,7 +303,7 @@ interface TelegramContextType {
   setQuickFilter: (filter: 'all' | 'channel' | 'group' | 'user') => void;
   filteredChats: TelegramChat[];
   fetchChats: (forceRefresh?: boolean) => Promise<TelegramChat[]>;
-  switchToNextChat: (direction: 'next' | 'prev', dragOffsetX?: number) => void;
+  switchToNextChat: (direction: 'next' | 'prev') => void;
   chatSlideDirection: 'left' | 'right' | null;
   chatTransitionId: number;
 
@@ -524,74 +524,6 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
     });
   }, [chats, quickFilter, lang]);
 
-  const activePeerAndChatsRef = useRef({ activePeer, filteredChats });
-  activePeerAndChatsRef.current = { activePeer, filteredChats };
-
-  const switchToNextChat = useCallback(
-    (direction: 'next' | 'prev', dragOffsetX: number = 0) => {
-      const list = filteredChats;
-      if (!list || list.length <= 1) return;
-
-      const isSaved = !activePeer || activePeer === 'me';
-      const currentIndex = list.findIndex(
-        (c) => (c.id === 'me' && isSaved) || c.id === activePeer
-      );
-
-      let targetIndex = 0;
-      if (currentIndex === -1) {
-        targetIndex = direction === 'next' ? 0 : list.length - 1;
-      } else {
-        if (direction === 'next') {
-          targetIndex = (currentIndex + 1) % list.length;
-        } else {
-          targetIndex = (currentIndex - 1 + list.length) % list.length;
-        }
-      }
-
-      const targetChat = list[targetIndex];
-      if (!targetChat) return;
-
-      // In LTR tab strip: 'next' moves RIGHT in tabs -> page slides LEFT; 'prev' moves LEFT in tabs -> page slides RIGHT
-      const slideDir: 'left' | 'right' = direction === 'next' ? 'left' : 'right';
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('telecloud-before-chat-switch', {
-            detail: { direction: slideDir, startOffsetX: dragOffsetX },
-          })
-        );
-      }
-      setChatSlideDirection(slideDir);
-      setChatTransitionId((prev) => prev + 1);
-
-      setActivePeerState(targetChat.id);
-      setActiveChatTitle(
-        targetChat.id === 'me' || targetChat.type === 'saved'
-          ? (lang === 'fa' ? 'سیو مسیج' : 'Saved Messages')
-          : targetChat.title
-      );
-      setSelectedFileIds([]);
-
-      if (targetChat.id === 'me' || targetChat.type === 'saved') {
-        setCanUploadInActiveChat(true);
-        setCanDeleteInActiveChat(true);
-        setIsActiveChatAdmin(true);
-        setActiveChatType('saved');
-      } else {
-        const cType = targetChat.type || 'user';
-        const cUpload = targetChat.canUpload !== undefined
-          ? targetChat.canUpload
-          : cType === 'bot' || cType === 'user' || cType === 'group' || cType === 'supergroup';
-        const cDelete = targetChat.canDelete !== undefined ? targetChat.canDelete : cUpload;
-        const cAdmin = Boolean(targetChat.isAdmin);
-        setCanUploadInActiveChat(cUpload);
-        setCanDeleteInActiveChat(cDelete);
-        setIsActiveChatAdmin(cAdmin);
-        setActiveChatType(cType);
-      }
-    },
-    [filteredChats, activePeer, lang]
-  );
-
   // File data, in-memory channel cache & pagination
   const [files, setFiles] = useState<TelegramFile[]>([]);
   const [hasMoreFiles, setHasMoreFiles] = useState(false);
@@ -638,6 +570,99 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
       return `${acc}_${p}`;
     },
     [activeAccountId, user?.id, activePeer]
+  );
+
+  const preparePeerFilesState = useCallback(
+    (targetPeerId: string) => {
+      if (isDemoMode) return;
+      if (!isConnected) {
+        setFiles([]);
+        setHasMoreFiles(false);
+        nextOffsetIdRef.current = 0;
+        setIsLoading(false);
+        return;
+      }
+
+      const targetCacheKey = getCacheKey(targetPeerId || 'me');
+      if (channelCacheRef.current.has(targetCacheKey)) {
+        const cached = channelCacheRef.current.get(targetCacheKey)!;
+        setFiles(cached.files);
+        nextOffsetIdRef.current = cached.nextOffsetId;
+        setHasMoreFiles(cached.hasMore);
+        setIsLoading(false);
+      } else {
+        setFiles([]);
+        setHasMoreFiles(false);
+        nextOffsetIdRef.current = 0;
+        setIsLoading(true);
+      }
+    },
+    [isDemoMode, isConnected, getCacheKey]
+  );
+
+  const preparePeerFilesStateRef = useRef(preparePeerFilesState);
+  preparePeerFilesStateRef.current = preparePeerFilesState;
+
+  const activePeerAndChatsRef = useRef({ activePeer, filteredChats });
+  activePeerAndChatsRef.current = { activePeer, filteredChats };
+
+  const switchToNextChat = useCallback(
+    (direction: 'next' | 'prev') => {
+      const list = filteredChats;
+      if (!list || list.length <= 1) return;
+
+      const isSaved = !activePeer || activePeer === 'me';
+      const currentIndex = list.findIndex(
+        (c) => (c.id === 'me' && isSaved) || c.id === activePeer
+      );
+
+      let targetIndex = 0;
+      if (currentIndex === -1) {
+        targetIndex = direction === 'next' ? 0 : list.length - 1;
+      } else {
+        if (direction === 'next') {
+          targetIndex = (currentIndex + 1) % list.length;
+        } else {
+          targetIndex = (currentIndex - 1 + list.length) % list.length;
+        }
+      }
+
+      const targetChat = list[targetIndex];
+      if (!targetChat) return;
+
+      // In LTR tab strip: 'next' moves RIGHT in tabs -> page slides LEFT; 'prev' moves LEFT in tabs -> page slides RIGHT
+      const slideDir: 'left' | 'right' = direction === 'next' ? 'left' : 'right';
+      setChatSlideDirection(slideDir);
+      setChatTransitionId((prev) => prev + 1);
+      preparePeerFilesState(targetChat.id);
+
+      setActivePeerState(targetChat.id);
+      setActiveChatTitle(
+        targetChat.id === 'me' || targetChat.type === 'saved'
+          ? (lang === 'fa' ? 'سیو مسیج' : 'Saved Messages')
+          : targetChat.title
+      );
+      setSelectedFileIds([]);
+
+      if (targetChat.id === 'me' || targetChat.type === 'saved') {
+        setCanUploadInActiveChat(true);
+        setCanDeleteInActiveChat(true);
+        setIsActiveChatAdmin(true);
+        setActiveChatType('saved');
+      } else {
+        const cType = targetChat.type || 'user';
+        const cUpload = targetChat.canUpload !== undefined
+          ? targetChat.canUpload
+          : cType === 'bot' || cType === 'user' || cType === 'group' || cType === 'supergroup';
+        const cDelete = targetChat.canDelete !== undefined ? targetChat.canDelete : cUpload;
+        const cAdmin = Boolean(targetChat.isAdmin);
+        setCanUploadInActiveChat(cUpload);
+        setCanDeleteInActiveChat(cDelete);
+        setIsActiveChatAdmin(cAdmin);
+        setActiveChatType(cType);
+      }
+    },
+    [filteredChats, activePeer, lang, preparePeerFilesState]
   );
 
   // Live computed storage stats across all loaded files
@@ -1080,15 +1105,9 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         if (oldIdx !== -1 && newIdx !== -1) {
           slideDir = newIdx > oldIdx ? 'left' : 'right';
         }
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(
-            new CustomEvent('telecloud-before-chat-switch', {
-              detail: { direction: slideDir, startOffsetX: 0 },
-            })
-          );
-        }
         setChatSlideDirection(slideDir);
         setChatTransitionId((prev) => prev + 1);
+        preparePeerFilesStateRef.current(targetId);
       }
 
       setActivePeerState(targetId);
@@ -1192,6 +1211,10 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      if (!forceReload) {
+        setFiles([]);
+        setHasMoreFiles(false);
+      }
       setIsLoading(true);
       nextOffsetIdRef.current = 0;
 

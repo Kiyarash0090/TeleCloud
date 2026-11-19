@@ -89,7 +89,7 @@ export function MultiSelectBar() {
           : 'bottom-[5.25rem] md:bottom-6'
       }`}
     >
-      <div className="bg-[#0F172A]/95 dark:bg-[#11141C]/95 backdrop-blur-xl text-white border border-white/10 rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 shadow-2xl flex items-center justify-between gap-2 sm:gap-4 max-w-xl mx-auto">
+      <div className="bg-[#0F172A]/98 dark:bg-[#11141C]/98 sm:backdrop-blur-md text-white border border-white/10 rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 shadow-xl flex items-center justify-between gap-2 sm:gap-4 max-w-xl mx-auto">
         {/* Left: Selection count & Select All toggle */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button

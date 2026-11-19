@@ -78,7 +78,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ file, onClose }) => {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-slate-950/60 dark:bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 select-none animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 bg-slate-950/70 dark:bg-black/80 sm:backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 select-none animate-in fade-in duration-150"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -175,7 +175,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ file, onClose }) => {
               />
               <button
                 onClick={() => copyToClipboard(downloadUrl, 'download')}
-                className={`h-10 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 active:scale-95 cursor-pointer ${
+                className={`h-10 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 active:scale-95 cursor-pointer ${
                   copiedDownload
                     ? 'bg-emerald-600 text-white'
                     : 'bg-blue-600 hover:bg-blue-500 text-white'
@@ -219,7 +219,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ file, onClose }) => {
                 />
                 <button
                   onClick={() => copyToClipboard(streamUrl, 'stream')}
-                  className={`h-10 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 active:scale-95 cursor-pointer ${
+                  className={`h-10 px-3.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 active:scale-95 cursor-pointer ${
                     copiedStream
                       ? 'bg-emerald-600 text-white'
                       : 'bg-slate-800 dark:bg-[#232938] hover:bg-slate-700 dark:hover:bg-[#2C3444] text-white'
@@ -256,7 +256,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ file, onClose }) => {
               href={telegramShareHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 min-h-[42px] py-2.5 px-4 rounded-xl bg-[#229ED9] hover:bg-[#1e8ec4] text-white font-semibold text-xs flex items-center justify-center gap-2 whitespace-nowrap shadow-sm transition-all active:scale-95"
+              className="flex-1 min-h-[42px] py-2.5 px-4 rounded-xl bg-[#229ED9] hover:bg-[#1e8ec4] text-white font-semibold text-xs flex items-center justify-center gap-2 whitespace-nowrap shadow-sm transition-colors active:scale-95"
             >
               <Send className="w-4 h-4 shrink-0" />
               <span>{lang === 'fa' ? 'ارسال در تلگرام' : 'Share on Telegram'}</span>

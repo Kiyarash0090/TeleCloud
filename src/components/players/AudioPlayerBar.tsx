@@ -579,7 +579,7 @@ export function AudioPlayerBar() {
 
       {/* Playlist Queue Dropup Panel */}
       {showPlaylist && (
-        <div className="mb-2.5 bg-white/95 dark:bg-[#11141C]/95 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/80 dark:border-white/[0.08] p-3 max-h-60 sm:max-h-72 overflow-y-auto flex flex-col gap-1 text-xs animate-in fade-in slide-in-from-bottom-2 duration-200">
+        <div className="mb-2.5 bg-white dark:bg-[#11141C] sm:bg-white/95 sm:dark:bg-[#11141C]/95 sm:backdrop-blur-xl rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/80 dark:border-white/[0.08] p-3 max-h-60 sm:max-h-72 overflow-y-auto flex flex-col gap-1 text-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
           <div className="flex items-center justify-between px-2 pb-2 border-b border-slate-200/70 dark:border-white/[0.07] text-slate-800 dark:text-slate-100 font-bold">
             <span className="flex items-center gap-2 tabular-nums">
               <ListMusic className="w-4 h-4 text-emerald-500" />
@@ -653,7 +653,7 @@ export function AudioPlayerBar() {
 
       {/* Mobile Expanded Deck */}
       {isMobileExpanded && (
-        <div className="md:hidden mb-2 bg-white/95 dark:bg-[#11141C]/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-slate-200/80 dark:border-white/[0.08] p-4 flex flex-col gap-3.5 animate-in fade-in slide-in-from-bottom-3 duration-200">
+        <div className="md:hidden mb-2 bg-white dark:bg-[#11141C] rounded-3xl shadow-2xl border border-slate-200/80 dark:border-white/[0.08] p-4 flex flex-col gap-3.5 animate-in fade-in slide-in-from-bottom-3 duration-150">
           {/* Top Handle & Quick Actions */}
           <div className="flex items-center justify-between gap-2">
             <button
@@ -839,7 +839,7 @@ export function AudioPlayerBar() {
       )}
 
       {/* Main Floating Dock Bar */}
-      <div className="bg-white/95 dark:bg-[#11141C]/95 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-[0_14px_38px_rgba(15,23,42,0.18)] dark:shadow-[0_16px_44px_rgba(0,0,0,0.7)] border border-slate-200/80 dark:border-white/[0.08] overflow-visible relative transition-all">
+      <div className="bg-white dark:bg-[#11141C] sm:bg-white/95 sm:dark:bg-[#11141C]/95 sm:backdrop-blur-xl rounded-2xl sm:rounded-3xl shadow-[0_14px_38px_rgba(15,23,42,0.18)] dark:shadow-[0_16px_44px_rgba(0,0,0,0.7)] border border-slate-200/80 dark:border-white/[0.08] overflow-visible relative">
         {/* Top Interactive Scrub Bar */}
         <div
           dir="ltr"
@@ -1060,7 +1060,7 @@ export function AudioPlayerBar() {
               </button>
 
               {showSpeedMenu && (
-                <div className="absolute bottom-full end-0 mb-2 w-24 rounded-2xl bg-white/95 dark:bg-[#11141C]/95 backdrop-blur-2xl shadow-2xl border border-slate-200/80 dark:border-white/[0.08] p-1.5 z-50 text-xs flex flex-col gap-0.5">
+                <div className="absolute bottom-full end-0 mb-2 w-24 rounded-2xl bg-white dark:bg-[#11141C] sm:bg-white/95 sm:dark:bg-[#11141C]/95 sm:backdrop-blur-xl shadow-2xl border border-slate-200/80 dark:border-white/[0.08] p-1.5 z-50 text-xs flex flex-col gap-0.5">
                   {[0.75, 1, 1.25, 1.5, 2].map((s) => (
                     <button
                       key={s}

@@ -97,7 +97,7 @@ export function FolderModal() {
   return (
     <div
       onClick={handleClose}
-      className="fixed inset-0 z-50 bg-slate-950/60 dark:bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 z-50 bg-slate-950/70 dark:bg-black/80 sm:backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150 select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -182,7 +182,7 @@ export function FolderModal() {
                       if (navigator.vibrate) navigator.vibrate(10);
                     }}
                     title={lang === 'fa' ? col.nameFa : col.nameEn}
-                    className={`relative w-8 h-8 rounded-full ${col.dotClass} flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                    className={`relative w-8 h-8 rounded-full ${col.dotClass} flex items-center justify-center transition-transform cursor-pointer shrink-0 ${
                       isSelected
                         ? 'ring-2 ring-offset-2 ring-blue-500 dark:ring-offset-[#11141C] scale-110 shadow-sm'
                         : 'hover:scale-105 opacity-85 hover:opacity-100'
@@ -235,7 +235,7 @@ export function FolderModal() {
               <span>{lang === 'fa' ? 'پیش‌نمایش پوشه' : 'Folder Preview'}</span>
             </div>
             <div
-              className={`p-3 rounded-2xl border ${currentColor.borderClass} ${currentColor.bgClass} flex items-center gap-3 transition-all`}
+              className={`p-3 rounded-2xl border ${currentColor.borderClass} ${currentColor.bgClass} flex items-center gap-3 transition-colors`}
             >
               <div
                 className={`w-9 h-9 rounded-xl flex items-center justify-center bg-white dark:bg-[#11141C] shadow-2xs ${currentColor.textClass}`}

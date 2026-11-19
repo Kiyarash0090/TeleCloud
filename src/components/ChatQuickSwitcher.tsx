@@ -98,7 +98,7 @@ export function ChatQuickSwitcher() {
                 key={tab.id}
                 type="button"
                 onClick={() => setQuickFilter(tab.id as any)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold shrink-0 whitespace-nowrap transition-all duration-150 cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold shrink-0 whitespace-nowrap transition-colors duration-150 cursor-pointer ${
                   active
                     ? 'bg-white dark:bg-[#232938] text-slate-900 dark:text-slate-100 shadow-xs'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
@@ -149,7 +149,7 @@ export function ChatQuickSwitcher() {
               ref={isSelected ? (el) => { activeChipRef.current = el; } : undefined}
               type="button"
               onClick={() => handleSelectChat(chat)}
-              className={`group flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 whitespace-nowrap transition-all duration-150 active:scale-95 cursor-pointer border ${
+              className={`group flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold shrink-0 whitespace-nowrap transition-colors duration-150 active:scale-95 cursor-pointer border ${
                 isSelected
                   ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-600/20'
                   : 'bg-[#F4F6FA] dark:bg-[#171B26] hover:bg-slate-200/70 dark:hover:bg-white/[0.07] text-slate-700 dark:text-slate-300 border-slate-200/75 dark:border-white/[0.06]'

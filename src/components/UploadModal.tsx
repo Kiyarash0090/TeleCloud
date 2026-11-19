@@ -32,7 +32,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-slate-950/60 dark:bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 select-none animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 bg-slate-950/70 dark:bg-black/80 sm:backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 select-none animate-in fade-in duration-150"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -123,7 +123,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ onClose }) => {
               handleFiles(e.dataTransfer.files);
             }}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl p-6 sm:p-9 text-center cursor-pointer transition-all active:scale-[0.99] ${
+            className={`border-2 border-dashed rounded-2xl p-6 sm:p-9 text-center cursor-pointer transition-colors active:scale-[0.99] ${
               isDragging
                 ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-500/10'
                 : 'border-slate-300/90 dark:border-white/[0.12] hover:border-blue-400 dark:hover:border-sky-400/50 bg-[#F4F6FA] dark:bg-[#171B26]'

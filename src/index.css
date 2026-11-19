@@ -219,22 +219,19 @@ html {
   touch-action: none;
 }
 
-/* Telegram-Style Account Popover Scale Spring Animation */
+/* Telegram-Style Account Popover Scale Spring Animation (GPU-only transform + opacity) */
 @keyframes account-popover-spring-in {
   0% {
     opacity: 0;
-    transform: scale(0.35) translate3d(0, 18px, 0);
-    filter: blur(4px);
+    transform: scale(0.55) translate3d(0, 14px, 0);
   }
-  65% {
+  70% {
     opacity: 1;
-    transform: scale(1.03) translate3d(0, -2px, 0);
-    filter: blur(0px);
+    transform: scale(1.02) translate3d(0, -1px, 0);
   }
   100% {
     opacity: 1;
     transform: scale(1) translate3d(0, 0, 0);
-    filter: blur(0px);
   }
 }
 
@@ -245,17 +242,17 @@ html {
   }
   100% {
     opacity: 0;
-    transform: scale(0.45) translate3d(0, 14px, 0);
+    transform: scale(0.6) translate3d(0, 10px, 0);
   }
 }
 
 .account-popover-enter {
-  animation: account-popover-spring-in 0.34s cubic-bezier(0.22, 1.28, 0.36, 1) forwards;
-  will-change: transform, opacity, filter;
+  animation: account-popover-spring-in 0.24s cubic-bezier(0.22, 1.24, 0.36, 1) forwards;
+  will-change: transform, opacity;
 }
 
 .account-popover-exit {
-  animation: account-popover-spring-out 0.16s cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: account-popover-spring-out 0.14s cubic-bezier(0.4, 0, 1, 1) forwards;
   will-change: transform, opacity;
 }
 

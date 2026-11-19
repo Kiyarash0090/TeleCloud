@@ -71,7 +71,7 @@ export function AddToFolderModal() {
   return (
     <div
       onClick={handleClose}
-      className="fixed inset-0 z-50 bg-slate-950/60 dark:bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 z-50 bg-slate-950/70 dark:bg-black/80 sm:backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150 select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -174,7 +174,7 @@ export function AddToFolderModal() {
                 <div
                   key={folder.id}
                   onClick={() => handleToggleFolder(folder.id)}
-                  className={`group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all cursor-pointer active:scale-[0.99] min-h-[56px] ${
+                  className={`group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-colors cursor-pointer active:scale-[0.99] min-h-[56px] ${
                     isInFolder
                       ? `${colorConfig.borderClass} ${colorConfig.bgClass} shadow-2xs`
                       : 'border-slate-200/70 dark:border-white/[0.06] bg-white dark:bg-[#171B26]/80 hover:bg-slate-50 dark:hover:bg-[#1C212E]'
@@ -202,7 +202,7 @@ export function AddToFolderModal() {
 
                   {/* Toggle Indicator Button */}
                   <div
-                    className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all shrink-0 ${
+                    className={`w-7 h-7 rounded-xl flex items-center justify-center transition-colors shrink-0 ${
                       isInFolder
                         ? 'bg-blue-600 text-white shadow-xs'
                         : 'bg-slate-100 dark:bg-[#11141C] text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'

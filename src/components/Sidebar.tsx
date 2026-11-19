@@ -354,7 +354,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
               setIsUploadModalOpen(true);
               onClose?.();
             }}
-            className="w-full mb-2.5 h-10.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs sm:text-sm shadow-sm shadow-blue-600/20 flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] cursor-pointer whitespace-nowrap"
+            className="w-full mb-2.5 h-10.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs sm:text-sm shadow-sm shadow-blue-600/20 flex items-center justify-center gap-2 transition-colors duration-150 active:scale-[0.98] cursor-pointer whitespace-nowrap"
           >
             <UploadCloud className="w-4.5 h-4.5 stroke-[2]" />
             <span>{t('upload')}</span>
@@ -404,7 +404,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
             setSelectedExtension(null);
             onClose?.();
           }}
-          className={`w-full mb-4 flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all duration-150 cursor-pointer ${
+          className={`w-full mb-4 flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-colors duration-150 cursor-pointer ${
             activeTab === 'favorites'
               ? 'bg-amber-500/12 text-amber-700 dark:text-amber-300'
               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-white/[0.04] hover:text-slate-900 dark:hover:text-slate-200'
@@ -452,7 +452,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                 setFolderToEdit(null);
                 setIsFolderModalOpen(true);
               }}
-              className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-200 dark:border-white/[0.08] hover:border-blue-400 dark:hover:border-sky-500/50 hover:bg-blue-50/40 dark:hover:bg-sky-500/5 transition-all cursor-pointer flex items-center gap-2.5 text-start"
+              className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-200 dark:border-white/[0.08] hover:border-blue-400 dark:hover:border-sky-500/50 hover:bg-blue-50/40 dark:hover:bg-sky-500/5 transition-colors cursor-pointer flex items-center gap-2.5 text-start"
             >
               <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-sky-400 flex items-center justify-center shrink-0">
                 <Plus className="w-3.5 h-3.5" />
@@ -483,7 +483,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                       setSelectedExtension(null);
                       onClose?.();
                     }}
-                    className={`group/folder w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all duration-150 cursor-pointer ${
+                    className={`group/folder w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-colors duration-150 cursor-pointer ${
                       isActive
                         ? `${colorConfig.bgClass} ${colorConfig.textClass}`
                         : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-white/[0.04] hover:text-slate-900 dark:hover:text-slate-200'
@@ -536,7 +536,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
               <button
                 key={cat.id}
                 onClick={() => handleSelectCategory(cat.id)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all duration-150 cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-colors duration-150 cursor-pointer ${
                   isActive
                     ? 'bg-blue-600/10 dark:bg-sky-500/15 text-blue-600 dark:text-sky-400'
                     : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-white/[0.04] hover:text-slate-900 dark:hover:text-slate-200'
@@ -580,7 +580,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
           </button>
           <button
             onClick={(e) => toggleTheme(e)}
-            className="flex-1 flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl bg-[#F4F6FA] dark:bg-[#171B26] text-xs font-semibold text-slate-700 dark:text-slate-200 active:scale-95 transition-all cursor-pointer overflow-hidden"
+            className="flex-1 flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl bg-[#F4F6FA] dark:bg-[#171B26] text-xs font-semibold text-slate-700 dark:text-slate-200 active:scale-95 transition-colors cursor-pointer overflow-hidden"
           >
             <div className="relative w-3.5 h-3.5 flex items-center justify-center shrink-0">
               {isDark ? (
@@ -633,7 +633,7 @@ export function Sidebar({ onClose, className }: { onClose?: () => void; classNam
                 <div
                   key={seg.key}
                   style={{ width: `${Math.max(4, (seg.size / totalBytes) * 100)}%` }}
-                  className={`h-full ${seg.color} first:rounded-s-full last:rounded-e-full transition-all duration-300`}
+                  className={`h-full ${seg.color} first:rounded-s-full last:rounded-e-full transition-[width] duration-300`}
                   title={`${seg.label}: ${formatFileSize(seg.size)}`}
                 />
               ))

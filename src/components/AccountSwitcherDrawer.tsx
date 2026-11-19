@@ -123,14 +123,14 @@ export function AccountSwitcherDrawer() {
       {/* Dimmed backdrop - adapts to Light & Dark mode */}
       <div
         onClick={requestClose}
-        className={`fixed inset-0 bg-slate-950/35 dark:bg-black/60 backdrop-blur-[2px] transition-opacity duration-200 ${
+        className={`fixed inset-0 bg-slate-950/40 dark:bg-black/65 transition-opacity duration-150 ${
           isClosing ? 'opacity-0' : 'opacity-100'
         }`}
       />
 
       {/* Floating Compact Account Popover Menu */}
       <div
-        className={`fixed bottom-16 end-3 sm:end-8 w-64 sm:w-72 bg-white/95 dark:bg-[#11141C]/95 backdrop-blur-2xl text-slate-800 dark:text-slate-100 rounded-2xl border border-slate-200/80 dark:border-white/[0.08] shadow-2xl shadow-slate-900/15 dark:shadow-black/60 overflow-hidden z-50 flex flex-col account-popover-origin transition-colors duration-200 ${
+        className={`fixed bottom-16 end-3 sm:end-8 w-64 sm:w-72 bg-white dark:bg-[#11141C] text-slate-800 dark:text-slate-100 rounded-2xl border border-slate-200/80 dark:border-white/[0.08] shadow-xl shadow-slate-900/15 dark:shadow-black/60 overflow-hidden z-50 flex flex-col account-popover-origin ${
           isClosing ? 'account-popover-exit' : 'account-popover-enter'
         }`}
       >

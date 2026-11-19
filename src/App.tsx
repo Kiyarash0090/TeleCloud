@@ -98,71 +98,38 @@ function TeleCloudApp() {
   const swipeGestureTypeRef = useRef<'pull' | 'horizontal' | null>(null);
   const horizontalSwipeDeltaRef = useRef<number>(0);
   const canHorizontalSwipeRef = useRef<boolean>(true);
-  const [pullDistance, setPullDistance] = useState(0);
+  const pullDistanceRef = useRef(0);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
-  const [swipeOffsetX, setSwipeOffsetX] = useState(0);
-  const [isSwipeSnapping, setIsSwipeSnapping] = useState(false);
+  const pullIndicatorRef = useRef<HTMLDivElement>(null);
+  const pullBubbleRef = useRef<HTMLDivElement>(null);
+  const pullIconRef = useRef<SVGSVGElement>(null);
+  const pullRafRef = useRef<number | null>(null);
+  const swipeRafRef = useRef<number | null>(null);
   const tabViewportRef = useRef<HTMLDivElement>(null);
   const tabContentRef = useRef<HTMLDivElement>(null);
-  const ghostHostRef = useRef<HTMLDivElement>(null);
-  const ghostTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const snapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const incomingStartOffsetRef = useRef<number>(0);
+
+  const applyPullStyles = (height: number, animate = false) => {
+    const indicator = pullIndicatorRef.current;
+    const bubble = pullBubbleRef.current;
+    const icon = pullIconRef.current;
+    if (indicator) {
+      indicator.style.transition = animate ? 'height 180ms cubic-bezier(0.22, 1, 0.36, 1)' : 'none';
+      indicator.style.height = `${height}px`;
+    }
+    if (bubble) {
+      const ready = height >= 54 || isPullRefreshing;
+      bubble.style.opacity = height > 4 || isPullRefreshing ? (ready ? '1' : '0.85') : '0';
+      bubble.style.transform = ready ? 'scale(1)' : 'scale(0.9)';
+    }
+    if (icon && !isPullRefreshing) {
+      icon.style.transform = `rotate(${Math.round(height * 4.2)}deg)`;
+    }
+  };
 
   useEffect(() => {
-    const handleBeforeChatSwitch = (ev: Event) => {
-      const detail = (
-        ev as CustomEvent<{ direction: 'left' | 'right'; startOffsetX?: number }>
-      ).detail;
-      if (!detail) return;
-      const startOffset = detail.startOffsetX || 0;
-      incomingStartOffsetRef.current = startOffset;
-
-      const contentEl = tabContentRef.current;
-      const ghostHost = ghostHostRef.current;
-      if (!contentEl || !ghostHost) return;
-
-      if (ghostTimerRef.current) {
-        clearTimeout(ghostTimerRef.current);
-        ghostTimerRef.current = null;
-      }
-
-      const clone = contentEl.cloneNode(true) as HTMLElement;
-      clone.style.transform = `translate3d(${startOffset}px, 0, 0)`;
-      clone.style.transition = 'none';
-      clone.style.willChange = 'transform, opacity';
-
-      ghostHost.innerHTML = '';
-      ghostHost.appendChild(clone);
-
-      const targetX = detail.direction === 'left' ? '-100%' : '100%';
-      const startOpacity = Math.max(0.7, 1 - Math.abs(startOffset) / 480);
-
-      clone.animate(
-        [
-          { transform: `translate3d(${startOffset}px, 0, 0)`, opacity: startOpacity },
-          { transform: `translate3d(${targetX}, 0, 0)`, opacity: 0.35 },
-        ],
-        {
-          duration: 240,
-          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-          fill: 'forwards',
-        }
-      );
-
-      ghostTimerRef.current = setTimeout(() => {
-        if (ghostHostRef.current) {
-          ghostHostRef.current.innerHTML = '';
-        }
-        ghostTimerRef.current = null;
-      }, 250);
-    };
-
-    window.addEventListener('telecloud-before-chat-switch', handleBeforeChatSwitch);
     return () => {
-      window.removeEventListener('telecloud-before-chat-switch', handleBeforeChatSwitch);
-      if (ghostTimerRef.current) clearTimeout(ghostTimerRef.current);
-      if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
+      if (pullRafRef.current) cancelAnimationFrame(pullRafRef.current);
+      if (swipeRafRef.current) cancelAnimationFrame(swipeRafRef.current);
     };
   }, []);
 
@@ -171,30 +138,27 @@ function TeleCloudApp() {
     const contentEl = tabContentRef.current;
     if (!contentEl || !chatSlideDirection) return;
 
-    const startOffset = incomingStartOffsetRef.current;
-    incomingStartOffsetRef.current = 0;
-
     contentEl.getAnimations().forEach((a) => a.cancel());
+    contentEl.style.transform = '';
+    contentEl.style.willChange = 'transform, opacity';
 
-    const fromX =
-      chatSlideDirection === 'left'
-        ? startOffset
-          ? `calc(100% + ${startOffset}px)`
-          : '100%'
-        : startOffset
-        ? `calc(-100% + ${startOffset}px)`
-        : '-100%';
-
-    contentEl.animate(
+    const fromX = chatSlideDirection === 'left' ? '30%' : '-30%';
+    const anim = contentEl.animate(
       [
-        { transform: `translate3d(${fromX}, 0, 0)` },
-        { transform: 'translate3d(0, 0, 0)' },
+        { transform: `translate3d(${fromX}, 0, 0)`, opacity: 0.25 },
+        { transform: 'translate3d(0, 0, 0)', opacity: 1 },
       ],
       {
-        duration: 240,
-        easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+        duration: 200,
+        easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)',
       }
     );
+    anim.onfinish = () => {
+      contentEl.style.willChange = '';
+    };
+    anim.oncancel = () => {
+      contentEl.style.willChange = '';
+    };
   }, [chatTransitionId, chatSlideDirection]);
 
   const handleMainTouchStart = (e: React.TouchEvent<HTMLElement>) => {
@@ -225,11 +189,6 @@ function TeleCloudApp() {
 
     const touch = e.touches[0];
     if (!touch) return;
-    if (snapTimerRef.current) {
-      clearTimeout(snapTimerRef.current);
-      snapTimerRef.current = null;
-    }
-    setIsSwipeSnapping(false);
     touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
     swipeGestureTypeRef.current = null;
     horizontalSwipeDeltaRef.current = 0;
@@ -262,7 +221,11 @@ function TeleCloudApp() {
         filteredChats.length > 1
       ) {
         swipeGestureTypeRef.current = 'horizontal';
-        setIsSwipeSnapping(false);
+        const contentEl = tabContentRef.current;
+        if (contentEl) {
+          contentEl.getAnimations().forEach((a) => a.cancel());
+          contentEl.style.willChange = 'transform';
+        }
       }
     }
 
@@ -270,18 +233,27 @@ function TeleCloudApp() {
       if (el.scrollTop > 2) {
         touchStartRef.current = null;
         swipeGestureTypeRef.current = null;
-        setPullDistance(0);
+        pullDistanceRef.current = 0;
+        applyPullStyles(0, true);
         return;
       }
-      if (deltaY > 6) {
-        const damped = Math.min(96, (deltaY - 6) * 0.45);
-        setPullDistance(damped);
-      } else {
-        setPullDistance(0);
-      }
+      const damped = deltaY > 6 ? Math.min(96, (deltaY - 6) * 0.45) : 0;
+      pullDistanceRef.current = damped;
+      if (pullRafRef.current) cancelAnimationFrame(pullRafRef.current);
+      pullRafRef.current = requestAnimationFrame(() => {
+        applyPullStyles(pullDistanceRef.current, false);
+        pullRafRef.current = null;
+      });
     } else if (swipeGestureTypeRef.current === 'horizontal') {
       horizontalSwipeDeltaRef.current = deltaX;
-      setSwipeOffsetX(deltaX);
+      if (swipeRafRef.current) cancelAnimationFrame(swipeRafRef.current);
+      swipeRafRef.current = requestAnimationFrame(() => {
+        const contentEl = tabContentRef.current;
+        if (contentEl) {
+          contentEl.style.transform = `translate3d(${horizontalSwipeDeltaRef.current}px, 0, 0)`;
+        }
+        swipeRafRef.current = null;
+      });
     }
   };
 
@@ -289,16 +261,27 @@ function TeleCloudApp() {
     const gestureType = swipeGestureTypeRef.current;
     const currentDelta = horizontalSwipeDeltaRef.current;
     const startTime = touchStartRef.current?.time || Date.now();
+    const currentPull = pullDistanceRef.current;
 
     touchStartRef.current = null;
     swipeGestureTypeRef.current = null;
     horizontalSwipeDeltaRef.current = 0;
     canHorizontalSwipeRef.current = true;
 
+    if (pullRafRef.current) {
+      cancelAnimationFrame(pullRafRef.current);
+      pullRafRef.current = null;
+    }
+    if (swipeRafRef.current) {
+      cancelAnimationFrame(swipeRafRef.current);
+      swipeRafRef.current = null;
+    }
+
     if (gestureType === 'pull') {
-      if (pullDistance >= 54 && !isPullRefreshing) {
+      pullDistanceRef.current = 0;
+      if (currentPull >= 54 && !isPullRefreshing) {
         setIsPullRefreshing(true);
-        setPullDistance(52);
+        applyPullStyles(52, true);
         if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
           try {
             window.navigator.vibrate(25);
@@ -312,10 +295,10 @@ function TeleCloudApp() {
           ]);
         } finally {
           setIsPullRefreshing(false);
-          setPullDistance(0);
+          applyPullStyles(0, true);
         }
       } else {
-        setPullDistance(0);
+        applyPullStyles(0, true);
       }
     } else if (gestureType === 'horizontal') {
       const elapsed = Math.max(16, Date.now() - startTime);
@@ -325,21 +308,34 @@ function TeleCloudApp() {
         !activeFolder &&
         (Math.abs(currentDelta) >= 48 || (Math.abs(currentDelta) >= 22 && velocity >= 0.35));
 
+      const contentEl = tabContentRef.current;
       if (shouldSwitch) {
-        setSwipeOffsetX(0);
-        setIsSwipeSnapping(false);
-        switchToNextChat(currentDelta < 0 ? 'next' : 'prev', currentDelta);
-      } else if (currentDelta !== 0) {
-        setIsSwipeSnapping(true);
-        setSwipeOffsetX(0);
-        if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
-        snapTimerRef.current = setTimeout(() => {
-          setIsSwipeSnapping(false);
-          snapTimerRef.current = null;
-        }, 220);
-      } else {
-        setSwipeOffsetX(0);
-        setIsSwipeSnapping(false);
+        if (contentEl) {
+          contentEl.style.transform = '';
+          contentEl.style.willChange = '';
+        }
+        switchToNextChat(currentDelta < 0 ? 'next' : 'prev');
+      } else if (contentEl && currentDelta !== 0) {
+        contentEl.style.transform = '';
+        const snapAnim = contentEl.animate(
+          [
+            { transform: `translate3d(${currentDelta}px, 0, 0)` },
+            { transform: 'translate3d(0, 0, 0)' },
+          ],
+          {
+            duration: 180,
+            easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+          }
+        );
+        snapAnim.onfinish = () => {
+          contentEl.style.willChange = '';
+        };
+        snapAnim.oncancel = () => {
+          contentEl.style.willChange = '';
+        };
+      } else if (contentEl) {
+        contentEl.style.transform = '';
+        contentEl.style.willChange = '';
       }
     }
   };
@@ -474,7 +470,7 @@ function TeleCloudApp() {
         {isMobileMenuOpen && (
           <div className="fixed inset-0 z-50 md:hidden flex">
             <div 
-              className="fixed inset-0 bg-black/55 backdrop-blur-xs animate-in fade-in duration-200"
+              className="fixed inset-0 bg-black/60 animate-in fade-in duration-150"
               onClick={() => setIsMobileMenuOpen(false)}
             />
             <div className="relative z-10 w-72 max-w-[85vw] h-full bg-white dark:bg-[#11141C] shadow-2xl flex flex-col animate-in slide-in-from-start duration-200">
@@ -498,30 +494,29 @@ function TeleCloudApp() {
             activeAudio ? 'pb-44 md:pb-32' : 'pb-24 md:pb-14'
           }`}
         >
-          {/* Pull-to-Refresh Indicator */}
-          {(pullDistance > 0 || isPullRefreshing) && (
+          {/* Pull-to-Refresh Indicator (rAF-driven without React re-renders) */}
+          <div
+            ref={pullIndicatorRef}
+            className="flex items-center justify-center overflow-hidden pointer-events-none"
+            style={{ height: isPullRefreshing ? 48 : 0 }}
+          >
             <div
-              className="flex items-center justify-center overflow-hidden transition-all duration-150 pointer-events-none"
-              style={{ height: isPullRefreshing ? 48 : pullDistance }}
+              ref={pullBubbleRef}
+              className="w-9 h-9 rounded-full bg-white dark:bg-[#171B26] border border-slate-200/90 dark:border-white/[0.08] shadow-md flex items-center justify-center"
+              style={{
+                opacity: isPullRefreshing ? 1 : 0,
+                transform: isPullRefreshing ? 'scale(1)' : 'scale(0.9)',
+                transition: 'transform 150ms ease, opacity 150ms ease',
+              }}
             >
-              <div
-                className={`w-9 h-9 rounded-full bg-white dark:bg-[#171B26] border border-slate-200/90 dark:border-white/[0.08] shadow-md flex items-center justify-center transition-transform ${
-                  pullDistance >= 54 || isPullRefreshing ? 'scale-100' : 'scale-90 opacity-85'
+              <RotateCw
+                ref={pullIconRef}
+                className={`w-4.5 h-4.5 text-blue-600 dark:text-sky-400 ${
+                  isPullRefreshing ? 'animate-spin' : ''
                 }`}
-              >
-                <RotateCw
-                  className={`w-4.5 h-4.5 text-blue-600 dark:text-sky-400 ${
-                    isPullRefreshing ? 'animate-spin' : ''
-                  }`}
-                  style={
-                    !isPullRefreshing
-                      ? { transform: `rotate(${Math.round(pullDistance * 4.2)}deg)` }
-                      : undefined
-                  }
-                />
-              </div>
+              />
             </div>
-          )}
+          </div>
 
           {/* Full Workspace Drag & Drop Active Overlay */}
           {canUploadInActiveChat && isWorkspaceDragging && (
@@ -603,31 +598,10 @@ function TeleCloudApp() {
               {/* Quick Channels & Chats Switcher Bar */}
               {activeTab === 'files' && !activeFolder && <ChatQuickSwitcher />}
 
-              {/* Sliding Tab Content Viewport (Telegram-style horizontal page transition) */}
+              {/* Sliding Tab Content Viewport (Lightweight GPU-composited slide) */}
               <div ref={tabViewportRef} className="relative overflow-x-clip px-1 -mx-1">
-                {/* Outgoing tab ghost during directional slide */}
-                <div
-                  ref={ghostHostRef}
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 px-1 overflow-hidden z-10"
-                />
-
-                {/* Active tab content with live finger-follow drag */}
-                <div
-                  ref={tabContentRef}
-                  style={
-                    swipeOffsetX !== 0 || isSwipeSnapping
-                      ? {
-                          transform: `translate3d(${swipeOffsetX}px, 0, 0)`,
-                          opacity: Math.max(0.72, 1 - Math.abs(swipeOffsetX) / 480),
-                          transition: isSwipeSnapping
-                            ? 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease'
-                            : 'none',
-                          willChange: 'transform, opacity',
-                        }
-                      : undefined
-                  }
-                >
+                {/* Active tab content with direct rAF finger-follow drag */}
+                <div ref={tabContentRef}>
                   {/* Category & Format Filters */}
                   <QuickFilters />
 
@@ -773,8 +747,8 @@ function TeleCloudApp() {
 
       {/* Action / Permission Error Floating Toast */}
       {actionError && (
-        <div className="fixed bottom-24 md:bottom-10 inset-x-0 z-50 flex justify-center px-4 pointer-events-none animate-in fade-in slide-in-from-bottom-4 duration-200">
-          <div className="bg-rose-600/95 text-white backdrop-blur-xl border border-white/20 px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 text-xs sm:text-sm font-bold max-w-md text-center">
+        <div className="fixed bottom-24 md:bottom-10 inset-x-0 z-50 flex justify-center px-4 pointer-events-none animate-in fade-in slide-in-from-bottom-4 duration-150">
+          <div className="bg-rose-600 text-white border border-white/20 px-4 py-2.5 rounded-2xl shadow-lg flex items-center gap-2 text-xs sm:text-sm font-bold max-w-md text-center">
             <span>{actionError}</span>
           </div>
         </div>
@@ -782,8 +756,8 @@ function TeleCloudApp() {
 
       {/* Double-Back-to-Exit Floating Toast */}
       {showExitToast && (
-        <div className="fixed bottom-20 md:bottom-8 inset-x-0 z-50 flex justify-center px-4 pointer-events-none animate-in fade-in slide-in-from-bottom-4 duration-200">
-          <div className="bg-slate-900/95 dark:bg-zinc-900/95 text-white backdrop-blur-xl border border-white/15 px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-bold">
+        <div className="fixed bottom-20 md:bottom-8 inset-x-0 z-50 flex justify-center px-4 pointer-events-none animate-in fade-in slide-in-from-bottom-4 duration-150">
+          <div className="bg-slate-900 dark:bg-zinc-900 text-white border border-white/15 px-4 py-2.5 rounded-2xl shadow-lg flex items-center gap-2.5 text-xs sm:text-sm font-bold">
             <LogOut className="w-4 h-4 text-sky-400 shrink-0" />
             <span>
               {lang === 'fa'

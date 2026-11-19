@@ -195,7 +195,7 @@ export function FileCard({ file }: { file: TelegramFile }) {
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
         onContextMenu={handleContextMenu}
-        className={`group relative rounded-2xl border transition-all duration-150 overflow-hidden flex flex-col cursor-pointer select-none ${
+        className={`group relative rounded-2xl border transition-[transform,border-color] duration-150 overflow-hidden flex flex-col cursor-pointer select-none ${
           isSelected
             ? 'bg-blue-50/75 dark:bg-blue-950/30 border-blue-500 ring-2 ring-blue-500/50 shadow-sm scale-[0.99]'
             : 'bg-white dark:bg-[#11141C] border-slate-200/80 dark:border-white/[0.075] shadow-[var(--shadow-card)] hover:-translate-y-0.5 hover:border-blue-500/40 dark:hover:border-sky-400/35 hover:shadow-[var(--shadow-card-hover)]'
@@ -213,7 +213,7 @@ export function FileCard({ file }: { file: TelegramFile }) {
               className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-200 pointer-events-none"
             />
           ) : (
-            <div className={`w-14 h-14 rounded-2xl bg-white/85 dark:bg-[#171B26]/85 border border-white/40 dark:border-white/[0.06] backdrop-blur-xs flex items-center justify-center shadow-2xs ${colors.text} transition-transform duration-200 group-hover:scale-105`}>
+            <div className={`w-14 h-14 rounded-2xl bg-white/90 dark:bg-[#171B26]/95 border border-white/40 dark:border-white/[0.06] flex items-center justify-center shadow-2xs ${colors.text} transition-transform duration-150 group-hover:scale-105`}>
               {renderCategoryIcon()}
             </div>
           )}
@@ -227,12 +227,12 @@ export function FileCard({ file }: { file: TelegramFile }) {
               if (navigator.vibrate) navigator.vibrate(15);
             }}
             aria-label="Select file"
-            className={`absolute top-2.5 start-2.5 z-20 w-6 h-6 rounded-lg flex items-center justify-center transition-all duration-150 cursor-pointer ${
+            className={`absolute top-2.5 start-2.5 z-20 w-6 h-6 rounded-lg flex items-center justify-center transition-opacity duration-150 cursor-pointer ${
               isSelected
                 ? 'bg-blue-600 text-white shadow-sm opacity-100'
                 : isSelectionMode
-                ? 'bg-slate-950/60 backdrop-blur-md border-2 border-white/80 text-transparent opacity-100'
-                : 'bg-slate-950/50 backdrop-blur-md border border-white/70 text-transparent opacity-0 group-hover:opacity-100 hover:scale-105'
+                ? 'bg-slate-950/70 border-2 border-white/80 text-transparent opacity-100'
+                : 'bg-slate-950/60 border border-white/70 text-transparent opacity-0 group-hover:opacity-100 hover:scale-105'
             }`}
           >
             <Check className={`w-3.5 h-3.5 stroke-[3] ${isSelected ? 'opacity-100' : 'opacity-0'}`} />
@@ -240,14 +240,14 @@ export function FileCard({ file }: { file: TelegramFile }) {
 
           {/* Extension Label */}
           {ext && !isSelectionMode && (
-            <span className="absolute top-2.5 start-2.5 group-hover:opacity-0 transition-opacity px-1.5 py-0.5 rounded-md bg-slate-950/65 backdrop-blur-md text-white text-[9px] font-mono font-bold tracking-wider uppercase pointer-events-none">
+            <span className="absolute top-2.5 start-2.5 group-hover:opacity-0 transition-opacity px-1.5 py-0.5 rounded-md bg-slate-950/75 text-white text-[9px] font-mono font-bold tracking-wider uppercase pointer-events-none">
               {ext}
             </span>
           )}
 
           {/* Duration Label */}
           {Boolean(file.duration && file.duration > 0) && (
-            <span className="absolute bottom-2 end-2 px-1.5 py-0.5 rounded-md bg-slate-950/75 backdrop-blur-md text-white text-[10px] font-mono font-medium tabular-nums pointer-events-none group-hover:opacity-0 sm:group-hover:opacity-0 transition-opacity">
+            <span className="absolute bottom-2 end-2 px-1.5 py-0.5 rounded-md bg-slate-950/80 text-white text-[10px] font-mono font-medium tabular-nums pointer-events-none group-hover:opacity-0 sm:group-hover:opacity-0 transition-opacity">
               {formatDuration(file.duration!)}
             </span>
           )}
@@ -264,10 +264,10 @@ export function FileCard({ file }: { file: TelegramFile }) {
                 }}
                 title={isFav ? t('removeFromFavorites') : t('addToFavorites')}
                 aria-label="Toggle favorite"
-                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-150 cursor-pointer ${
+                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-transform duration-150 active:scale-90 cursor-pointer ${
                   isFav
                     ? 'bg-amber-400 text-slate-950 shadow-sm opacity-100'
-                    : 'bg-slate-950/50 backdrop-blur-md text-white/90 sm:opacity-0 sm:group-hover:opacity-100 hover:text-amber-300'
+                    : 'bg-slate-950/60 text-white/90 sm:opacity-0 sm:group-hover:opacity-100 hover:text-amber-300'
                 }`}
               >
                 <Star className={`w-3.5 h-3.5 ${isFav ? 'fill-slate-950 stroke-slate-950' : 'fill-none stroke-current'}`} />
@@ -279,7 +279,7 @@ export function FileCard({ file }: { file: TelegramFile }) {
                   setShowMobileActions(true);
                 }}
                 aria-label="Actions"
-                className="sm:hidden w-7 h-7 rounded-lg bg-slate-950/50 backdrop-blur-md text-white flex items-center justify-center active:scale-90"
+                className="sm:hidden w-7 h-7 rounded-lg bg-slate-950/60 text-white flex items-center justify-center active:scale-90"
               >
                 <MoreVertical className="w-3.5 h-3.5" />
               </button>
@@ -289,7 +289,7 @@ export function FileCard({ file }: { file: TelegramFile }) {
           {/* Desktop Hover Glass Action Dock */}
           {!isSelectionMode && (
             <div className="hidden sm:flex absolute inset-0 bg-gradient-to-t from-slate-950/65 via-slate-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-150 items-end justify-center p-2.5">
-              <div className="flex items-center gap-0.5 p-1 rounded-xl bg-slate-950/80 backdrop-blur-md border border-white/15 shadow-xl">
+              <div className="flex items-center gap-0.5 p-1 rounded-xl bg-slate-950/85 sm:backdrop-blur-sm border border-white/15 shadow-xl">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -504,7 +504,7 @@ export function FileCard({ file }: { file: TelegramFile }) {
       {showMobileActions && (
         <div
           onClick={() => setShowMobileActions(false)}
-          className="sm:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end justify-center animate-in fade-in duration-150"
+          className="sm:hidden fixed inset-0 z-50 bg-black/65 flex items-end justify-center animate-in fade-in duration-150"
         >
           <div
             onClick={(e) => e.stopPropagation()}

@@ -59,7 +59,7 @@ export function PWAInstallBanner() {
 
   return (
     <>
-      <div className="fixed bottom-20 md:bottom-6 left-3 right-3 sm:left-auto sm:right-6 sm:w-96 z-40 bg-white/95 dark:bg-[#11141C]/95 backdrop-blur-xl border border-slate-200/80 dark:border-white/[0.08] shadow-2xl rounded-2xl p-3.5 transition-all animate-in fade-in slide-in-from-bottom-5 duration-300">
+      <div className="fixed bottom-20 md:bottom-6 left-3 right-3 sm:left-auto sm:right-6 sm:w-96 z-40 bg-white dark:bg-[#11141C] sm:bg-white/95 sm:dark:bg-[#11141C]/95 sm:backdrop-blur-md border border-slate-200/80 dark:border-white/[0.08] shadow-xl rounded-2xl p-3.5 animate-in fade-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-600/25 mt-0.5">
             <Smartphone className="w-5 h-5" />
@@ -114,7 +114,7 @@ export function PWAInstallBanner() {
       {showIOSGuide && (
         <div
           onClick={() => setShowIOSGuide(false)}
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/60 dark:bg-black/75 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/70 dark:bg-black/80 sm:backdrop-blur-xs p-0 sm:p-4 animate-in fade-in duration-150"
         >
           <div
             onClick={(e) => e.stopPropagation()}

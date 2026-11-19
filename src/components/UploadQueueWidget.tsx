@@ -308,7 +308,7 @@ export const UploadQueueWidget: React.FC = () => {
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={() => setIsPaused(true)}
       onTouchEnd={() => setIsPaused(false)}
-      className={`fixed ${bottomPositionClass} inset-x-2.5 sm:inset-x-auto sm:end-4 z-40 sm:w-96 bg-white/95 dark:bg-[#11141C]/95 backdrop-blur-2xl rounded-2xl border border-slate-200/80 dark:border-white/[0.08] shadow-[0_16px_44px_rgba(15,23,42,0.18)] dark:shadow-[0_18px_48px_rgba(0,0,0,0.65)] overflow-hidden transition-all duration-200 select-none animate-in fade-in slide-in-from-bottom-3`}
+      className={`fixed ${bottomPositionClass} inset-x-2.5 sm:inset-x-auto sm:end-4 z-40 sm:w-96 bg-white/98 dark:bg-[#11141C]/98 sm:backdrop-blur-md rounded-2xl border border-slate-200/80 dark:border-white/[0.08] shadow-[0_12px_32px_rgba(15,23,42,0.16)] dark:shadow-[0_14px_36px_rgba(0,0,0,0.6)] overflow-hidden transition-[transform,opacity] duration-150 select-none animate-in fade-in slide-in-from-bottom-3`}
     >
       {/* Header (CSS selector 1) */}
       <div

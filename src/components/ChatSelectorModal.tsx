@@ -179,7 +179,7 @@ export const ChatSelectorModal: React.FC<ChatSelectorModalProps> = ({ onClose })
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-slate-950/60 dark:bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 select-none animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 bg-slate-950/65 dark:bg-black/75 sm:backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 select-none animate-in fade-in duration-150"
     >
       <div
         onClick={(e) => e.stopPropagation()}

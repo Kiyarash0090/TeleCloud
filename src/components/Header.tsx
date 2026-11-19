@@ -77,7 +77,7 @@ export function Header({ onToggleMobileMenu }: { onToggleMobileMenu?: () => void
       data-header="true"
       onTouchStart={(e) => e.stopPropagation()}
       onTouchMove={(e) => e.stopPropagation()}
-      className="shrink-0 sticky top-0 z-40 w-full h-14 md:h-[60px] border-b border-slate-200/85 dark:border-white/[0.075] bg-white/90 dark:bg-[#11141C]/90 backdrop-blur-xl px-3 sm:px-5 lg:px-6 flex items-center justify-between gap-2.5 sm:gap-5 transition-colors select-none"
+      className="shrink-0 sticky top-0 z-40 w-full h-14 md:h-[60px] border-b border-slate-200/85 dark:border-white/[0.075] bg-white/96 dark:bg-[#11141C]/96 md:backdrop-blur-md px-3 sm:px-5 lg:px-6 flex items-center justify-between gap-2.5 sm:gap-5 transition-colors select-none"
     >
       {/* Zone 1: Mobile Menu Trigger & Desktop Brand / Breadcrumb Trail */}
       <div className="flex items-center gap-2 shrink-0 md:min-w-0">

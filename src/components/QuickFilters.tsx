@@ -90,7 +90,7 @@ export function QuickFilters() {
                   <button
                     key={ext}
                     onClick={() => setSelectedExtension(active ? null : ext)}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-semibold transition-all duration-150 shrink-0 cursor-pointer active:scale-95 ${
+                    className={`px-2 py-1 rounded-lg text-[10px] font-mono font-semibold transition-colors duration-150 shrink-0 cursor-pointer active:scale-95 ${
                       active
                         ? 'bg-blue-600 text-white shadow-xs'
                         : 'bg-white dark:bg-[#11141C] border border-slate-200/80 dark:border-white/[0.075] text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:border-slate-300 dark:hover:border-white/15'
@@ -118,7 +118,7 @@ export function QuickFilters() {
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={selectAllFiltered}
-            className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer active:scale-95 whitespace-nowrap ${
+            className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors duration-150 cursor-pointer active:scale-95 whitespace-nowrap ${
               isSelectionMode
                 ? 'bg-blue-600/10 dark:bg-sky-500/15 text-blue-600 dark:text-sky-400 border border-blue-500/25'
                 : 'bg-white dark:bg-[#11141C] border border-slate-200/80 dark:border-white/[0.075] text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-white/15'

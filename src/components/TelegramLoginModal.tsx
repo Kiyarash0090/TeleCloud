@@ -340,7 +340,7 @@ export function TelegramLoginModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/60 dark:bg-black/75 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-slate-950/70 dark:bg-black/80 sm:backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150">
       <div className="bg-white dark:bg-[#11141C] w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl shadow-slate-900/20 dark:shadow-black/70 border-t sm:border border-slate-200/80 dark:border-white/[0.08] p-5 sm:p-7 max-h-[92dvh] overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-7">
         {/* Mobile Drag Handle */}
         <div className="sm:hidden flex justify-center pb-3">

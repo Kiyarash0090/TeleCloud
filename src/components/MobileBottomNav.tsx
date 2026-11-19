@@ -74,7 +74,7 @@ export function MobileBottomNav() {
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="md:hidden fixed bottom-2.5 inset-x-3 max-w-md mx-auto z-30 bg-white/90 dark:bg-[#11141C]/92 backdrop-blur-2xl border border-slate-200/80 dark:border-white/[0.08] rounded-2xl px-1.5 py-1 flex items-center justify-around shadow-[0_12px_32px_rgba(15,23,42,0.12)] dark:shadow-[0_12px_36px_rgba(0,0,0,0.65)] select-none"
+      className="md:hidden fixed bottom-2.5 inset-x-3 max-w-md mx-auto z-30 bg-white/95 dark:bg-[#11141C]/96 border border-slate-200/85 dark:border-white/[0.08] rounded-2xl px-1.5 py-1 flex items-center justify-around shadow-[0_8px_24px_rgba(15,23,42,0.12)] dark:shadow-[0_10px_28px_rgba(0,0,0,0.6)] select-none"
     >
       {/* 1. All Files */}
       <button

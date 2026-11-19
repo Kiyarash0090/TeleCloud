@@ -830,7 +830,7 @@ export function VideoPlayerModal({
             triggerPipControls();
           }
         }}
-        className={`fixed z-50 aspect-16/10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.7)] border border-white/20 bg-[#11141C]/90 backdrop-blur-2xl group/pip select-none flex flex-col justify-between ring-1 ring-white/10 pip-smooth-container ${
+        className={`fixed z-50 aspect-16/10 rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.7)] border border-white/20 bg-[#11141C] group/pip select-none flex flex-col justify-between ring-1 ring-white/10 pip-smooth-container ${
           isPipInteracting ? 'ring-2 ring-sky-400 shadow-2xl' : 'cursor-default'
         }`}
       >
@@ -899,7 +899,7 @@ export function VideoPlayerModal({
             startPipDrag(e.clientX, e.clientY);
           }}
           onDoubleClick={() => setIsVideoPiP(false)}
-          className={`absolute top-0 inset-x-0 p-2 sm:p-2.5 bg-gradient-to-b from-black/85 via-black/40 to-transparent flex items-center justify-between gap-2 z-40 text-white backdrop-blur-[2px] cursor-grab active:cursor-grabbing touch-none transition-opacity duration-250 ${
+          className={`absolute top-0 inset-x-0 p-2 sm:p-2.5 bg-gradient-to-b from-black/85 via-black/40 to-transparent flex items-center justify-between gap-2 z-40 text-white cursor-grab active:cursor-grabbing touch-none transition-opacity duration-200 ${
             showPipControls ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
         >
@@ -984,7 +984,7 @@ export function VideoPlayerModal({
 
         {/* Video Element Viewport (Supports Drag + Tap to Toggle Controls) */}
         <div 
-          className="relative w-full h-full flex items-center justify-center cursor-pointer bg-black/40 backdrop-blur-xs touch-none"
+          className="relative w-full h-full flex items-center justify-center cursor-pointer bg-black touch-none"
           onPointerDown={(e) => {
             if ((e.target as HTMLElement).closest('button')) return;
             startPipDrag(e.clientX, e.clientY);
@@ -1132,7 +1132,7 @@ export function VideoPlayerModal({
         if (Date.now() - lastTouchTimeRef.current < 800) return;
         resetControlsTimeout();
       }}
-      className="fixed inset-0 z-50 flex flex-col justify-between select-none overflow-hidden font-sans group transition-colors backdrop-blur-2xl"
+      className="fixed inset-0 z-50 flex flex-col justify-between select-none overflow-hidden font-sans group"
     >
       {/* Mobile Pull-Down Handle Indicator */}
       <div className="sm:hidden pt-[max(0.4rem,env(safe-area-inset-top))] flex justify-center pointer-events-none z-40">
@@ -1253,7 +1253,7 @@ export function VideoPlayerModal({
 
         {/* Double click 10s ripple feedback */}
         {doubleTapFeedback && (
-          <div className={`absolute top-1/2 -translate-y-1/2 ${doubleTapFeedback === 'left' ? 'left-12' : 'right-12'} z-30 pointer-events-none flex items-center gap-2 px-6 py-4 rounded-full bg-black/60 backdrop-blur-xl border border-white/20 text-white animate-in zoom-in-75 fade-out duration-500 shadow-2xl`}>
+          <div className={`absolute top-1/2 -translate-y-1/2 ${doubleTapFeedback === 'left' ? 'left-12' : 'right-12'} z-30 pointer-events-none flex items-center gap-2 px-6 py-4 rounded-full bg-black/80 border border-white/20 text-white animate-in zoom-in-75 fade-out duration-500 shadow-2xl`}>
             {doubleTapFeedback === 'left' ? (
               <>
                 <RotateCcw className="w-6 h-6 text-sky-400 animate-spin" />
@@ -1271,7 +1271,7 @@ export function VideoPlayerModal({
         {/* Interactive Center Play/Pause & Skip Controls (Only active when controls are visible) */}
         {!isTranscodingLoading && (
           <div
-            className={`absolute inset-0 flex items-center justify-center pointer-events-none z-20 transition-all duration-300 ${
+            className={`absolute inset-0 flex items-center justify-center pointer-events-none z-20 transition-[transform,opacity] duration-200 ${
               showControls ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
             }`}
           >
@@ -1284,7 +1284,7 @@ export function VideoPlayerModal({
                   skipTime(-10);
                   resetControlsTimeout();
                 }}
-                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-2xl border border-white/20 text-white flex items-center justify-center shadow-2xl transition-all active:scale-90 ring-1 ring-white/10 cursor-pointer ${
+                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-black/75 hover:bg-black/85 border border-white/20 text-white flex items-center justify-center shadow-2xl transition-transform active:scale-90 ring-1 ring-white/10 cursor-pointer ${
                   showControls ? 'pointer-events-auto' : 'pointer-events-none'
                 }`}
                 title="۱۰ ثانیه به عقب"
@@ -1299,7 +1299,7 @@ export function VideoPlayerModal({
                   if (!showControls) return;
                   togglePlay();
                 }}
-                className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-black/55 hover:bg-black/75 backdrop-blur-2xl border border-white/25 text-white flex items-center justify-center shadow-2xl transition-all hover:scale-105 active:scale-95 ring-1 ring-white/10 cursor-pointer ${
+                className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-black/75 hover:bg-black/85 border border-white/25 text-white flex items-center justify-center shadow-2xl transition-transform hover:scale-105 active:scale-95 ring-1 ring-white/10 cursor-pointer ${
                   showControls ? 'pointer-events-auto' : 'pointer-events-none'
                 }`}
                 title={isPlaying ? 'توقف' : 'پخش'}
@@ -1319,7 +1319,7 @@ export function VideoPlayerModal({
                   skipTime(10);
                   resetControlsTimeout();
                 }}
-                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-black/50 hover:bg-black/70 backdrop-blur-2xl border border-white/20 text-white flex items-center justify-center shadow-2xl transition-all active:scale-90 ring-1 ring-white/10 cursor-pointer ${
+                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-black/75 hover:bg-black/85 border border-white/20 text-white flex items-center justify-center shadow-2xl transition-transform active:scale-90 ring-1 ring-white/10 cursor-pointer ${
                   showControls ? 'pointer-events-auto' : 'pointer-events-none'
                 }`}
                 title="۱۰ ثانیه به جلو"
@@ -1348,7 +1348,7 @@ export function VideoPlayerModal({
 
       {/* ----------------- Top Header Bar ----------------- */}
       <div 
-        className={`absolute top-0 inset-x-0 p-3 sm:p-5 pt-[max(0.75rem,env(safe-area-inset-top))] bg-gradient-to-b from-black/85 via-black/40 to-transparent backdrop-blur-[2px] flex items-center justify-between gap-2 text-white z-40 transition-all duration-300 ${
+        className={`absolute top-0 inset-x-0 p-3 sm:p-5 pt-[max(0.75rem,env(safe-area-inset-top))] bg-gradient-to-b from-black/85 via-black/40 to-transparent flex items-center justify-between gap-2 text-white z-40 transition-[transform,opacity] duration-200 ${
           showControls ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'
         }`}
         onClick={(e) => {
@@ -1357,7 +1357,7 @@ export function VideoPlayerModal({
         }}
       >
         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/25 backdrop-blur-md">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/25">
             <Film className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div className="min-w-0 flex-1">
@@ -1446,7 +1446,7 @@ export function VideoPlayerModal({
 
       {/* ----------------- Bottom Floating Controls Panel ----------------- */}
       <div 
-        className={`absolute bottom-0 inset-x-0 p-2.5 sm:p-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-40 transition-all duration-300 ${
+        className={`absolute bottom-0 inset-x-0 p-2.5 sm:p-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-40 transition-[transform,opacity] duration-200 ${
           showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
         }`}
         onClick={(e) => {
@@ -1454,7 +1454,7 @@ export function VideoPlayerModal({
           resetControlsTimeout();
         }}
       >
-        <div className="bg-[#11141C]/90 backdrop-blur-2xl border border-white/15 rounded-2xl sm:rounded-3xl p-2.5 sm:px-5 sm:py-3.5 shadow-2xl flex flex-col gap-2 max-w-5xl mx-auto">
+        <div className="bg-[#11141C]/95 sm:bg-[#11141C]/90 sm:backdrop-blur-md border border-white/15 rounded-2xl sm:rounded-3xl p-2.5 sm:px-5 sm:py-3.5 shadow-2xl flex flex-col gap-2 max-w-5xl mx-auto">
           
           {/* Progress Bar */}
           <div 
@@ -1580,7 +1580,7 @@ export function VideoPlayerModal({
                 </button>
 
                 {showQualityMenu && (
-                  <div className="absolute bottom-full end-0 mb-3 w-56 rounded-2xl bg-[#11141C]/95 backdrop-blur-2xl border border-white/15 p-2 shadow-2xl z-50 text-xs flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="absolute bottom-full end-0 mb-3 w-56 rounded-2xl bg-[#11141C]/98 sm:bg-[#11141C]/95 sm:backdrop-blur-xl border border-white/15 p-2 shadow-2xl z-50 text-xs flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
                     <div className="px-3 py-1.5 text-[11px] font-bold text-slate-400 border-b border-white/[0.08] flex items-center justify-between">
                       <span>موتور پخش و کیفیت</span>
                       <Zap className="w-3 h-3 text-amber-400" />
@@ -1670,7 +1670,7 @@ export function VideoPlayerModal({
                 </button>
 
                 {showSpeedMenu && (
-                  <div className="absolute bottom-full end-0 mb-3 w-28 rounded-2xl bg-[#11141C]/95 backdrop-blur-2xl border border-white/15 p-1.5 shadow-2xl z-50 text-xs flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="absolute bottom-full end-0 mb-3 w-28 rounded-2xl bg-[#11141C]/98 sm:bg-[#11141C]/95 sm:backdrop-blur-xl border border-white/15 p-1.5 shadow-2xl z-50 text-xs flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150">
                     {[0.5, 0.75, 1, 1.25, 1.5, 2].map((s) => (
                       <button
                         key={s}

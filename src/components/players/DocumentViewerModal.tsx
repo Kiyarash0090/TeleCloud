@@ -62,11 +62,11 @@ export function DocumentViewerModal({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-slate-950/60 dark:bg-black/75 backdrop-blur-xl flex items-end sm:items-center justify-center p-0 sm:p-6 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 bg-slate-950/75 dark:bg-black/85 sm:backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-6 animate-in fade-in duration-150"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white/95 dark:bg-[#11141C]/95 backdrop-blur-2xl w-full max-w-4xl h-[92dvh] sm:h-[85vh] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200/80 dark:border-white/[0.08] flex flex-col overflow-hidden"
+        className="bg-white dark:bg-[#11141C] w-full max-w-4xl h-[92dvh] sm:h-[85vh] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200/80 dark:border-white/[0.08] flex flex-col overflow-hidden"
       >
         {/* Header */}
         <div className="p-3.5 sm:p-4 border-b border-slate-200/70 dark:border-white/[0.07] bg-[#F4F6FA]/85 dark:bg-[#171B26]/85 flex items-center justify-between gap-2">
